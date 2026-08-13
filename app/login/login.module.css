@@ -1,0 +1,47 @@
+/*
+ * Login — DESIGN.md "Superficies y elevación":
+ * "Fondo de página --bg; login con degradado sutil --bg → --cyan-soft (160deg)."
+ *
+ * The gradient is painted here rather than on <body> so it belongs to this
+ * screen only. It resolves in both palettes on its own, because both stops are
+ * tokens: in dark, --cyan-soft is #12314a and the same 160deg sweep reads as the
+ * same idea.
+ */
+.screen {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: 24px;
+  background: linear-gradient(160deg, var(--bg), var(--cyan-soft));
+}
+
+/* "Tarjetas y paneles: --surface + borde 1px --border + radio 12–16px + --shadow." */
+.panel {
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+  width: 100%;
+  max-width: 420px;
+  padding: 28px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+/* The error screen renders a MessageState, which brings its own padding. */
+.panelMessage {
+  padding: 8px;
+}
+
+.intro {
+  margin: 0;
+  max-width: 34ch;
+  color: var(--muted);
+  font-size: var(--fs-body-sm);
+}
+
+.action {
+  margin-top: 6px;
+}

@@ -5,6 +5,7 @@ import { readAuthEnv } from "@/lib/auth/env";
 import { fetchDepartment } from "@/lib/auth/graph";
 import { authorizeAndSyncUsuario } from "@/lib/auth/sign-in";
 import { upsertUsuario } from "@/lib/auth/usuario-repository";
+import { AUTH_ERROR_PATH, SIGN_IN_PATH } from "@/lib/auth-gate";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -52,6 +53,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
    */
   session: { strategy: "jwt" },
 
+  /**
+   * The portal's own screens replace the default Auth.js pages.
+   *
+   * Both live under `/login`, which is also the one prefix the authentication
+   * gate keeps public: a redirect can therefore only ever land somewhere that
+   * is reachable without a session, which is what keeps the gate from looping.
+   *
+   * `error` is where a rejected sign-in arrives with `?error=AccessDenied` —
+   * the outcome of the `signIn` callback below returning `false`.
+   */
+  pages: {
+    signIn: SIGN_IN_PATH,
+    error: AUTH_ERROR_PATH,
+  },
+
   callbacks: {
     /**
      * The only place the portal decides who gets in.
@@ -60,10 +76,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
      * because the domain check runs before the database call, before anything
      * is written — a rejected user leaves no `usuario` row behind.
      *
-     * Auth.js sends a rejected sign-in to its error page with
-     * `error=AccessDenied`. Part 2 points `pages.error` (and `pages.signIn`) at
-     * the portal's own screens; until those exist, the default Auth.js pages
-     * are used so that no route in this item can 404.
+     * Auth.js sends a rejected sign-in to `pages.error` with
+     * `error=AccessDenied`, which the portal's own screen turns into an
+     * explanation that the account is not a corporate one — without naming the
+     * configured domain or the provider's error code.
      */
     async signIn({ profile, account }) {
       return authorizeAndSyncUsuario(profile ?? {}, account?.access_token, {
