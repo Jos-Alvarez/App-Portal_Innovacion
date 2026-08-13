@@ -36,10 +36,20 @@ recuperar el foco y en intervalos, de modo que un recurso revocado desaparece de
 siguiente interacción y cualquier intento de uso recibe el 403.
 
 **Protección CSRF.** Como la sesión se identifica con una cookie (Auth.js), la protección contra
-CSRF se **delega a Auth.js**: la cookie de sesión se emite con `SameSite=Lax` (el navegador no la
-adjunta en peticiones cross-site que muten estado) y Auth.js aporta sus **tokens CSRF integrados**
-para los endpoints de mutación (`POST`/`PATCH`/`DELETE` de sugerencias, asignaciones, admins,
-catálogo). No se implementa un mecanismo CSRF propio; se usa el del framework de autenticación.
+CSRF de los endpoints de mutación del portal (`POST`/`PATCH`/`DELETE` de sugerencias, asignaciones,
+admins, catálogo) descansa en que la cookie de sesión se emite con **`SameSite=Lax`**: el navegador
+no la adjunta en peticiones cross-site que muten estado, de modo que una petición forjada desde otro
+sitio llega sin sesión y el guard de autorización la rechaza. No se implementa un mecanismo CSRF
+propio.
+
+> **Corrección.** Una versión anterior de este párrafo atribuía esa protección a los **tokens CSRF
+> integrados de Auth.js**. Es inexacto: ese token protege únicamente los endpoints propios de
+> Auth.js bajo `/api/auth/*` (login, callback, logout), **no** las rutas REST del portal bajo
+> `/api/*` que define el ADR 0003. Tampoco aplica la protección automática de Origin/Host de las
+> Server Actions, porque el ADR 0003 las descartó explícitamente. La conclusión del ADR no cambia
+> —las rutas de mutación están protegidas— pero el mecanismo que las protege es `SameSite=Lax`, no
+> un token. La distinción importa: quien implemente esos endpoints no debe dar por sentado que
+> recibe un token CSRF que en realidad nunca se emite para ellos.
 
 ## Alternativas consideradas
 
