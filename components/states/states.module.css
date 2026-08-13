@@ -1,0 +1,62 @@
+/* Carga — blocks stack with the comfortable density DESIGN.md asks for. */
+.skeleton {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+
+/*
+ * Message shell shared by Vacío, Error and Sin permiso. One geometry keeps the
+ * three states reading as the same system: soft icon, title, explanation, exit.
+ */
+.message {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 28px 24px;
+  text-align: center;
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--cyan-soft);
+  color: var(--navy-fg);
+  font-size: 21px;
+  line-height: 1;
+}
+
+/* "El rojo jamás se usa fuera de error/destrucción." */
+.iconDanger {
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-weight: 800;
+}
+
+.title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: var(--ls-title);
+}
+
+.description {
+  margin: 0;
+  max-width: 38ch;
+  color: var(--muted);
+  font-size: var(--fs-body-sm);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 8px;
+}
