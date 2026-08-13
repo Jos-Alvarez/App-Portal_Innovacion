@@ -19,6 +19,7 @@ Dos aclaraciones sobre el alcance de este repositorio:
 | `TECH-DESIGN.md` | Diseño técnico: arquitectura, componentes y flujos. |
 | `DESIGN.md` | Sistema de diseño: identidad, modo claro/oscuro y estados de UI obligatorios. |
 | `BACKLOG.md` | Backlog ordenado por dependencia; cada ítem es un ciclo de SDD. |
+| `MIGRACIONES.md` | Runbook de migraciones: comandos, CHECK a mano, colación y drift. |
 | `adrs/` | Decisiones de arquitectura en formato MADR. |
 | `openspec/changes/` | Ciclos de Spec-Driven Development en curso y su documentación. |
 
