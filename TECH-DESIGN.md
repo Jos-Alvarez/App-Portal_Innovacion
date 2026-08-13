@@ -39,10 +39,11 @@ Dos desplegables + servicios externos (ADR 0001):
 - **Portal (Next.js + TypeScript):** UI, autenticación, catálogo, asignaciones, sugerencias,
   gestión de administradores, analítica y envío de correos **best-effort** (notificación directa al
   registrar una sugerencia; sin jobs en segundo plano — ADR 0008 rechazado).
-- **Servicio de procesadores (FastAPI + Python):** ejecuta los procesadores de archivos; expone un
-  **endpoint interno** (p. ej. `POST /interno/procesadores/{id}/ejecutar`, multipart ≤25 MB,
-  timeout 2 min) alcanzable **solo desde el portal por red interna** y con token de servicio —
-  nunca desde el navegador. El portal le delega la ejecución tras autorizar; FastAPI no lee la
+- **Servicio de procesadores (FastAPI + Python):** ejecuta los procesadores de archivos; expone
+  **una ruta interna por procesador** (p. ej. `POST /interno/procesadores/maestro-excel/ejecutar`,
+  multipart de uno o varios archivos, ≤25 MB cada uno, timeout 2 min), cada una como cáscara fina
+  sobre un pipeline común; alcanzable **solo desde el portal por red interna** y con token de
+  servicio — nunca desde el navegador. El portal le delega la ejecución tras autorizar; FastAPI no lee la
   sesión del usuario ni consulta permisos (ADR 0006, 0007). Corre con **workers fijos y limitados**
   y un **límite estricto de RAM por contenedor/instancia**, más validación temprana del tamaño
   descomprimido, para que un archivo anómalo mate a un worker aislado sin tumbar el servicio
@@ -60,25 +61,35 @@ Dos desplegables + servicios externos (ADR 0001):
 La ejecución de un procesador sigue el patrón **navegador → portal Next.js → FastAPI**, decidido
 para que la autorización por usuario viva en un solo lugar (ADR 0003, 0006, 0007):
 
-1. El navegador sube el archivo a `POST /api/procesadores/{id}/ejecutar`, **ruta del backend de
-   Next.js** (no de FastAPI).
+1. El navegador sube **uno o varios archivos** (según lo que declare la fila del procesador) a
+   `POST /api/procesadores/{id}/ejecutar`, **ruta del backend de Next.js** (no de FastAPI). Esta
+   ruta del portal es genérica para todos los procesadores.
 2. Next.js resuelve al usuario desde la cookie de sesión (Auth.js) y **verifica en SQL Server que
    tenga la asignación** al procesador. Sin fila de asignación → **403 en servidor** con la pantalla
    de sin-permiso (DESIGN.md), sin procesar.
-3. Solo si la autorización es exitosa, Next.js **reenvía el archivo por red interna** al endpoint
-   interno de FastAPI (`POST /interno/procesadores/{id}/ejecutar`), autenticando la llamada de
-   backend a backend con el **token de servicio**.
-4. FastAPI ejecuta (registry, validaciones, `evento_uso`) y devuelve el archivo resultante; Next.js
-   lo retransmite al navegador. FastAPI **nunca** ve la cookie de sesión ni consulta permisos:
-   confía en que el portal ya autorizó.
+3. Solo si la autorización es exitosa, Next.js resuelve la ruta destino a partir de
+   `clave_procesador` y **reenvía los archivos por red interna** a la ruta interna de FastAPI
+   (`POST /interno/procesadores/{clave}/ejecutar`), autenticando la llamada de backend a backend con
+   el **token de servicio**.
+4. FastAPI ejecuta (registry, validaciones) y devuelve el resultado — **el archivo suelto si es uno
+   solo, o un ZIP si el procesador produjo varios** — o un **error tipificado**; Next.js lo
+   retransmite al navegador y **escribe el `evento_uso`** correspondiente. FastAPI **nunca** ve la
+   cookie de sesión, no consulta permisos y **no escribe en la BD**: confía en que el portal ya
+   autorizó y deja el registro del evento en manos de quien conoce al usuario (ADR 0005, 0006).
 
 El procesamiento es **síncrono y sin estado (stateless)**: los archivos de entrada/salida se
 escriben en un **volumen temporal de disco** solo para aliviar la RAM durante la ejecución, y un
-bloque `try/finally` los **elimina de inmediato** tras enviar la respuesta (éxito o error). El
-servidor **no almacena archivos para descargas posteriores**; la persistencia del resultado es
-responsabilidad exclusiva del navegador del usuario (ADR 0006).
+bloque `try/finally` **elimina de inmediato todos** los temporales tras enviar la respuesta (éxito o
+error) — cada entrada, cada salida y el ZIP intermedio si se generó. El servidor **no almacena
+archivos para descargas posteriores**; la persistencia del resultado es responsabilidad exclusiva
+del navegador del usuario (ADR 0006).
 
-> **Nota técnica — se acepta el "doble salto" de red.** El archivo (hasta 25 MB) viaja
+Los límites se validan en tres niveles antes de procesar (ADR 0006): cada archivo contra el
+`tamano_max` del procesador, la suma comprimida contra su `tamano_max_total`, y la suma
+descomprimida declarada contra el límite seguro en RAM del worker. El presupuesto de memoria es del
+worker, no de cada archivo por separado.
+
+> **Nota técnica — se acepta el "doble salto" de red.** Los archivos (hasta 25 MB cada uno) viajan
 > navegador → portal → servicio en lugar de ir directo al servicio. Aceptamos ese doble salto (más
 > latencia y memoria transitoria en el portal) de forma deliberada: es el mecanismo que permite
 > **bloquear en servidor** el acceso a un procesador no asignado (requisito de seguridad del PRD)
@@ -96,7 +107,7 @@ responsabilidad exclusiva del navegador del usuario (ADR 0006).
 | [ADR-0003](adrs/0003-api-rest-json-interna.md) | API REST JSON interna como contrato UI ↔ servidor | Aceptado |
 | [ADR-0004](adrs/0004-stack-nextjs-typescript.md) | Stack por componente: Next.js + TS (portal), FastAPI + Python (procesadores) | Aceptado |
 | [ADR-0005](adrs/0005-base-datos-sql-server.md) | SQL Server como base de datos | Aceptado |
-| [ADR-0006](adrs/0006-procesadores-registro-modulos.md) | Procesadores como módulos Python con interfaz común y registro por clave | Aceptado |
+| [ADR-0006](adrs/0006-procesadores-registro-modulos.md) | Procesadores como módulos Python con interfaz común y registro por clave | Aceptado (contrato de E/S revisado: multi-archivo y salida ZIP) |
 | [ADR-0007](adrs/0007-estado-servidor-fuente-verdad.md) | Servidor como única fuente de verdad de permisos; UI con cache revalidable | Aceptado |
 | [ADR-0008](adrs/0008-resiliencia-outbox-y-chequeo-enlaces.md) | ~~Outbox de correos con job de reintento y chequeo periódico de enlaces~~ → correos best-effort, sin jobs ni chequeo de enlaces | Rechazado |
 | [ADR-0009](adrs/0009-auth-entra-id-rol-en-bd.md) | Autenticación con Entra ID; rol de administrador en la BD del portal | Aceptado |
@@ -111,7 +122,11 @@ Detalle completo en ADR 0002. Entidades y relaciones (todas con claves foráneas
   violeta "agente IA" del DESIGN.md sale del campo `tipo`. Los enlaces no se verifican en background
   (ADR 0008 rechazado).
 - `procesador` (nombre, descripcion, clave_procesador, formatos_aceptados, tamano_max ≤ 25 MB,
-  activo) — `clave_procesador` referencia el módulo Python del registry (ADR 0006).
+  entradas_min, entradas_max, tamano_max_total, salida_esperada archivo|zip, activo) —
+  `clave_procesador` referencia el módulo Python del registry (ADR 0006); los cuatro campos de
+  contrato declaran cuántos archivos admite una ejecución y qué recibe el usuario, y son la **única
+  fuente de verdad** de esa forma: el portal arma con ellos la interfaz de carga y el pipeline los
+  valida, sin que el módulo Python los duplique (ADR 0002).
 - `asignacion_enlace` (usuario_id, enlace_id) y `asignacion_procesador` (usuario_id,
   procesador_id) — permisos por usuario individual (PRD).
 - `sugerencia` (autor_id, titulo, descripcion, area_destino, estado actual
@@ -153,12 +168,23 @@ La preferencia de tema claro/oscuro no se persiste en BD: vive en `localStorage`
 
 ### Ejecución de procesador
 
-- [ ] Subida de archivo válido → el servicio FastAPI lo procesa y el navegador descarga el archivo
-      resultante, sin intervención manual; se registra `evento_uso` tipo `ejecucion`.
+- [ ] Subida válida → el servicio FastAPI la procesa y el navegador descarga el resultado, sin
+      intervención manual; se registra `evento_uso` tipo `ejecucion`.
+- [ ] Un procesador cuya fila declara `entradas_max > 1` habilita la carga múltiple en la UI; uno
+      con `entradas_min = entradas_max = 1` acepta un solo archivo. La interfaz se arma leyendo la
+      fila, sin conocer el módulo.
+- [ ] Un conjunto con menos archivos que `entradas_min` o más que `entradas_max` → banner con ese
+      motivo, sin procesar y sin instanciar el módulo.
+- [ ] Un procesador que devuelve **varios** archivos entrega un **ZIP** que el navegador descarga y
+      que contiene todos los resultados; uno que devuelve un solo archivo lo entrega suelto, con su
+      nombre y tipo MIME.
 - [ ] Archivo con formato no declarado por el procesador → banner rojo "formato no permitido", no
       se procesa, no hay archivo de salida; se registra `error_formato`.
 - [ ] Archivo que excede el `tamano_max` del procesador (tope general 25 MB) → banner con ese
       motivo, sin procesar; se registra `error_tamano`.
+- [ ] Conjunto de archivos individualmente válidos cuya **suma comprimida** excede el
+      `tamano_max_total` del procesador → banner con ese motivo, sin procesar; se registra
+      `error_tamano`.
 - [ ] Archivo de formato correcto pero contenido inválido (columnas faltantes, corrupto) → banner
       con el motivo específico y botón Reintentar, sin caída del servicio ni archivo de salida; se
       registra `error_contenido`.
@@ -202,8 +228,10 @@ La preferencia de tema claro/oscuro no se persiste en BD: vive en `localStorage`
 - [ ] El admin registra un enlace nuevo (nombre, URL, descripción, tipo) desde el portal, sin
       despliegue; queda disponible para asignar. Una URL vacía o mal formada bloquea el guardado
       con error en el campo (borde rojo + mensaje, DESIGN.md).
-- [ ] El admin da de alta la fila de un procesador (nombre, clave, formatos, tamaño máx.) desde el
-      panel; la parte de código sigue el registro del ADR 0006.
+- [ ] El admin da de alta la fila de un procesador (nombre, clave, formatos, tamaño máx., rango de
+      archivos de entrada, tope total y tipo de salida) desde el panel; la parte de código sigue el
+      registro del ADR 0006. Cambiar un procesador de uno a varios archivos es editar su fila, sin
+      desplegar.
 - [ ] Un colaborador no ve las pantallas de alta y recibe 403 si llega por URL directa.
 - [ ] El admin asigna/revoca recursos por usuario con el switch de DESIGN.md; cada cambio se
       confirma con toast y aplica sin "guardar" global.
@@ -238,9 +266,11 @@ La preferencia de tema claro/oscuro no se persiste en BD: vive en `localStorage`
   Mitigación acordada (ADR 0009): degradar a buscar solo entre usuarios que ya ingresaron al
   portal.
 - **BD compartida entre portal y servicio de procesadores:** resuelto por dueño único (ADR 0005):
-  Next.js/Prisma es el único dueño del esquema y el único que migra; FastAPI accede en modo "solo
-  lectura estructural" (espejo del esquema, sin permisos DDL). Costo residual: mantener el espejo
-  Python al día tras cada migración del portal.
+  Next.js/Prisma es el único dueño del esquema y el único que migra. Al pasar el registro de
+  `evento_uso` al portal, el acceso de FastAPI quedó de **solo lectura también en datos**: su
+  usuario de BD tiene `SELECT` y nada más, sin DDL y sin escritura. El espejo Python se reduce a las
+  tablas que necesita leer (`procesador`), con lo que el costo residual de mantenerlo sincronizado
+  tras cada migración del portal baja bastante.
 - **Autenticación portal ↔ FastAPI:** el modelo quedó decidido (proxy backend-a-backend: solo el
   portal llama a FastAPI, con token de servicio; ADR 0006, 0007). Queda pendiente el **detalle del
   token** (formato, rotación) y **garantizar que el endpoint interno de FastAPI no sea alcanzable

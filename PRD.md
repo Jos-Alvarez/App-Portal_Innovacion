@@ -52,13 +52,16 @@ y puede medir qué se usa más y por quién mediante una pantalla de analítica.
   muestra su versión normal.
 - Portal/dashboard donde el colaborador ve únicamente las apps, agentes y procesadores de archivos
   que le fueron asignados.
-- **Procesadores de archivos dentro del portal**: el usuario sube un archivo, el portal lo procesa
-  y devuelve el archivo resultante. Qué procesadores existen (Excel, Word, u otros formatos) depende
-  de la necesidad del usuario; no hay un formato "por defecto" fijo y la arquitectura permite agregar
-  nuevos procesadores más adelante.
-- Cada procesador declara explícitamente qué tipo(s) de archivo acepta; si el usuario sube un
-  formato no permitido, el portal muestra un mensaje indicando que el formato no es válido y no
-  intenta procesarlo.
+- **Procesadores de archivos dentro del portal**: el usuario sube **uno o varios archivos** (según
+  lo que ese procesador necesite), el portal los procesa y devuelve el resultado. Qué procesadores
+  existen (Excel, Word, u otros formatos) depende de la necesidad del usuario; no hay un formato
+  "por defecto" fijo y la arquitectura permite agregar nuevos procesadores más adelante.
+- **El resultado puede ser uno o varios archivos**: cuando un procesador produce varios (por
+  ejemplo, varios Excel derivados de un mismo insumo), el portal los entrega **empaquetados en un
+  ZIP**, de modo que el usuario siempre realiza una sola descarga.
+- Cada procesador declara explícitamente qué tipo(s) de archivo acepta y **cuántos archivos admite
+  por ejecución**; si el usuario sube un formato no permitido o una cantidad de archivos fuera de
+  lo declarado, el portal muestra un mensaje indicando el motivo y no intenta procesarlo.
 - **Enlaces a apps y agentes de IA**: el portal no desarrolla ni aloja estas aplicaciones (son
   desarrollos aparte); únicamente muestra el enlace asignado, que se abre en una nueva ventana/pestaña.
 - **Alta de enlaces desde el propio portal**: el registro de un nuevo enlace de app o agente
@@ -116,8 +119,10 @@ y puede medir qué se usa más y por quién mediante una pantalla de analítica.
 - Un colaborador puede iniciar sesión con su correo corporativo y ver únicamente las
   apps/agentes/procesadores que el administrador le asignó (verificado con al menos 2 usuarios
   de prueba con distintos accesos).
-- Un procesador de archivos completa el ciclo subida → procesamiento → descarga del archivo
-  resultante sin intervención manual.
+- Un procesador de archivos completa el ciclo subida → procesamiento → descarga del resultado sin
+  intervención manual, tanto cuando recibe un archivo como cuando recibe varios.
+- Un procesador que genera varios archivos de salida entrega un único ZIP que los contiene a todos;
+  el usuario descarga una sola vez.
 - Al subir un archivo con un formato distinto al que el procesador declara aceptar, el portal lo
   rechaza mostrando un mensaje claro de "formato no permitido" y no genera un archivo de salida.
 - Un enlace a una app/agente asignada abre la aplicación externa en una nueva ventana/pestaña.
@@ -182,6 +187,11 @@ y puede medir qué se usa más y por quién mediante una pantalla de analítica.
   el portal muestra un mensaje indicando ese motivo y no lo procesa. El tope general es **25 MB por
   archivo**; el límite de número de filas no es fijo, se define por procesador durante el
   levantamiento del requerimiento según lo que necesite el usuario.
+- Varios archivos que individualmente cumplen el tope pero **en conjunto** superan lo que el
+  procesador admite por ejecución: el portal lo rechaza indicando ese motivo, antes de procesar.
+  Cada procesador define también ese tope total.
+- El usuario sube menos archivos de los que el procesador necesita, o más de los que admite: el
+  portal lo indica con un mensaje claro y no procesa nada.
 - Un administrador revoca el acceso de un usuario mientras este tiene una sesión activa: el cambio
   debe aplicarse de forma inmediata (el usuario pierde el acceso al recurso en esa misma sesión, sin
   esperar a un nuevo login).

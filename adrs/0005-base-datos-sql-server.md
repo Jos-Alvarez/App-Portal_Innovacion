@@ -27,11 +27,16 @@ Ningún otro componente crea ni altera estructura.
 **Rol de Python: solo lectura estructural (espejo del esquema).** El servicio FastAPI (ADR 0004,
 0006) accede a la misma base de datos, pero en modo de **"solo lectura estructural"**: sus modelos
 en Python son únicamente un **espejo del esquema dictado por Next.js** (mapean tablas que ya
-existen para leer la fila del `procesador` y escribir filas en `evento_uso`). El servicio de
-procesadores tiene **estrictamente prohibido** crear tablas, modificarlas, gestionar índices o
-ejecutar migración alguna; si necesita un cambio de estructura, se solicita al portal, que lo
-implementa en su migración de Prisma. Esta regla se refuerza, cuando sea posible, con un **usuario
-de BD de privilegios acotados** para el servicio FastAPI (sin permisos DDL).
+existen, para leer la fila del `procesador`). El servicio de procesadores tiene **estrictamente
+prohibido** crear tablas, modificarlas, gestionar índices o ejecutar migración alguna; si necesita
+un cambio de estructura, se solicita al portal, que lo implementa en su migración de Prisma.
+
+**El acceso de FastAPI a la BD es de solo lectura, también en datos.** El registro de `evento_uso`
+lo hace el portal, no el servicio (ADR 0006): FastAPI devuelve el resultado o un error tipificado y
+el portal escribe el evento, porque es quien conoce al usuario. En consecuencia el servicio no
+escribe ninguna fila, y la regla se refuerza con un **usuario de BD de privilegios acotados** —
+`SELECT` sobre las tablas que necesita, sin DDL y **sin `INSERT`/`UPDATE`/`DELETE`**. Un permiso
+que no existe no se puede usar por accidente.
 
 ## Alternativas consideradas
 
