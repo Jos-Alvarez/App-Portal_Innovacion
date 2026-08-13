@@ -1,0 +1,47 @@
+# Dependencias
+node_modules/
+.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# Build de Next.js y salidas de compilacion
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# Tests y cobertura
+coverage/
+*.lcov
+.nyc_output/
+
+# Variables de entorno: se ignora todo menos la plantilla versionada
+.env
+.env.*
+!.env.example
+
+# Logs de gestores de paquetes
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Despliegue
+.vercel
+
+# Ruido del sistema operativo
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Editores
+.idea/
+*.swp
+
+# Nota: `prisma/migrations/` NO se ignora — el historial de migraciones se
+# versiona.
