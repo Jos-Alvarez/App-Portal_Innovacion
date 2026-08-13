@@ -1,0 +1,52 @@
+/*
+ * Estado con punto — DESIGN.md "Componentes": "punto 7px + texto 600 del color
+ * semántico (catálogo)".
+ *
+ * Tone resolution mirrors StatusChip exactly: one --dot-tone custom property
+ * set per data-tone, consumed by both the dot and the label, so the two can
+ * never drift apart. The tone values are the themed tokens, so this resolves in
+ * both palettes without a second list of hexadecimals.
+ */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--dot-tone);
+  font-size: var(--fs-body-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-pill);
+  background: var(--dot-tone);
+}
+
+.status[data-tone="neutral"] {
+  --dot-tone: var(--muted);
+}
+
+/* Foreground navy, not the fill: this is text, not a filled surface. */
+.status[data-tone="info"],
+.status[data-tone="navy"] {
+  --dot-tone: var(--navy-fg);
+}
+
+.status[data-tone="ok"] {
+  --dot-tone: var(--ok);
+}
+
+.status[data-tone="warn"] {
+  --dot-tone: var(--warn);
+}
+
+.status[data-tone="danger"] {
+  --dot-tone: var(--danger);
+}
+
+.status[data-tone="agent"] {
+  --dot-tone: var(--agent);
+}
