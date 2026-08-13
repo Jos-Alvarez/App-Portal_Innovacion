@@ -1,0 +1,141 @@
+/*
+ * The admin catalogue screen. Nothing here is a new component: the form fields,
+ * the table, the chips and the buttons are the shared ones, and this file only
+ * lays them out and dresses the two controls DESIGN.md describes but the
+ * components layer does not ship — a <select> and a <textarea>-scale field —
+ * with the very treatment "Componentes" already prescribes for inputs.
+ */
+
+.main {
+  display: grid;
+  gap: 24px;
+  align-content: start;
+  max-width: 1100px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 28px 24px 64px;
+}
+
+.header {
+  display: grid;
+  gap: 6px;
+}
+
+/* Tarjetas y paneles: --surface + borde 1px + radio 12–16px + --shadow. */
+.panel {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: var(--fs-body);
+  font-weight: 700;
+}
+
+/* Densidad cómoda: grids con gap 14–24px. */
+.fields {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  align-items: start;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+/* Matches the shared Input's label: body scale at 600, not the uppercase label. */
+.label {
+  font-size: var(--fs-body-sm);
+  font-weight: 600;
+}
+
+.select {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-body);
+}
+
+.select:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 1px;
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Error de acción: el rojo solo aparece aquí, nunca decorativo. */
+.alerta {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 7px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: var(--fs-body-sm);
+  font-weight: 600;
+}
+
+.tabla {
+  padding: 8px 24px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  overflow-x: auto;
+}
+
+.nombre {
+  display: grid;
+  gap: 2px;
+}
+
+.nombreTexto {
+  font-weight: 600;
+}
+
+/* Wide URLs must not push the row's actions off screen. */
+.direccion {
+  display: inline-block;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.filaAcciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.confirmacion {
+  font-size: var(--fs-meta);
+  font-weight: 600;
+}
+
+/* Destructivo: DESIGN.md reserva el rojo para error y destrucción. */
+.destructivo {
+  color: var(--danger);
+}
+
+.destructivo:hover:not(:disabled) {
+  background: var(--danger-bg);
+}
