@@ -202,6 +202,34 @@ describe("prisma schema — entities", () => {
     expect(field("Procesador", "claveProcesador").attributes).toContain("@unique");
   });
 
+  /**
+   * `enlace.nombre` is the enlace's identity to a collaborator: the dashboard
+   * shows the name, so two rows called "Facturación" are indistinguishable
+   * there and the one they need is a coin toss. The constraint belongs in the
+   * database and not only in the API, because a duplicate that slipped in by
+   * any other route would be just as unusable.
+   *
+   * `url` is deliberately NOT unique: registering the same external system
+   * twice, under two names for two audiences, is legitimate.
+   */
+  it("keeps enlace.nombre unique and enlace.url free to repeat", () => {
+    expect(field("Enlace", "nombre").attributes).toContain("@unique");
+    expect(field("Enlace", "url").attributes).not.toContain("@unique");
+  });
+
+  /**
+   * On SQL Server, Prisma expresses `@unique` as a table constraint rather than
+   * as a `CREATE UNIQUE INDEX` — the same form `usuario_correo_key` already
+   * takes in the initial migration. Asserting the constraint is what proves the
+   * schema attribute reached the database, since the attribute alone changes
+   * nothing until a migration carries it.
+   */
+  it("backs that uniqueness with a constraint in the migrations", () => {
+    expect(migrationSql).toMatch(
+      /ALTER\s+TABLE\s+\[dbo\]\.\[enlace\]\s+ADD\s+CONSTRAINT\s+\[enlace_nombre_key\]\s+UNIQUE\s+NONCLUSTERED\s*\(\s*\[nombre\]\s*\)/i,
+    );
+  });
+
   it("declares no scalar list, which the sqlserver provider cannot express", () => {
     const scalarLists = fields.filter((candidate) =>
       /^(String|Int|BigInt|Float|Decimal|Boolean|DateTime|Bytes|Json)\[\]$/.test(candidate.type),

@@ -1,3 +1,5 @@
+import type { ApiError } from "@/lib/api/errors";
+
 /**
  * Every authorization rule of the portal, expressed as pure functions.
  *
@@ -164,11 +166,17 @@ export function statusForDenial(reason: DenialReason): 401 | 403 {
   return denialKind(reason) === "session" ? 401 : 403;
 }
 
-/** The JSON error body of ADR 0003: a code, and a Spanish message the UI can show as-is. */
-export interface ApiError {
-  codigo: string;
-  mensaje: string;
-}
+/**
+ * The JSON error body of ADR 0003: a code, and a Spanish message the UI can
+ * show as-is.
+ *
+ * Defined in `lib/api/errors.ts` and re-exported here. The shape started out in
+ * this file because the guard was the first thing that needed it, but it is the
+ * whole API's envelope and not authorization's own — every route under `/api`
+ * answers a 400, a 404 or a 409 with these same two keys, so a client never has
+ * to infer the body shape from the status code.
+ */
+export type { ApiError } from "@/lib/api/errors";
 
 const ERRORS: Record<DenialKind, ApiError> = {
   session: {

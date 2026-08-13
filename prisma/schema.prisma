@@ -61,9 +61,15 @@ model Usuario {
 model Enlace {
   id Int @id @default(autoincrement())
 
-  nombre      String  @db.NVarChar(150)
+  /// Unique: the name is how a collaborator tells one enlace from another in
+  /// the dashboard, so two rows sharing it are indistinguishable there and the
+  /// right one becomes a coin toss. Uniqueness is not stated by ADR 0002; it
+  /// follows from the name being the enlace's identity to the reader.
+  nombre      String  @unique @db.NVarChar(150)
   /// Optionality not specified by ADR 0002; kept optional.
   descripcion String? @db.NVarChar(1000)
+  /// Deliberately NOT unique: the same external system may legitimately be
+  /// registered twice, under two names, for two audiences.
   url         String  @db.NVarChar(2048)
   /// Enum-shaped: "app" | "agente". Stored as a string because Prisma has no
   /// native enums on SQL Server; validated in the application layer.
