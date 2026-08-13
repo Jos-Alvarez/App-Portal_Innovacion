@@ -41,12 +41,6 @@
   --text: #0f2244;
   --muted: #5d6b84;
 
-  /* DERIVED — soft semantic backgrounds */
-  --ok-bg: color-mix(in srgb, var(--ok) 12%, var(--surface));
-  --warn-bg: color-mix(in srgb, var(--warn) 12%, var(--surface));
-  --danger-bg: color-mix(in srgb, var(--danger) 12%, var(--surface));
-  /* DERIVED — table/row hover surface */
-  --surface2: color-mix(in srgb, var(--bg) 60%, var(--surface));
   /* DERIVED — the "sombra doble suave" of DESIGN.md */
   --shadow: 0 1px 2px rgb(15 34 68 / 6%), 0 8px 24px rgb(15 34 68 / 8%);
 
@@ -109,6 +103,28 @@ body[data-lx-dark="1"] {
 
   /* Deeper shadow in dark, per DESIGN.md */
   --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 10px 28px rgb(0 0 0 / 45%);
+}
+
+/*
+ * DERIVED tokens — declared on `body`, not on `:root`, and that placement is
+ * load-bearing.
+ *
+ * A var() inside a custom property is substituted at computed-value time on the
+ * element the property is declared on, and the already-substituted value is
+ * what inherits downwards. Declared on `:root` these would be frozen against
+ * the light palette, because the dark pairs above are keyed on `body` and are
+ * therefore not in scope on <html> — dark mode would keep a light pink error
+ * background and a light shimmer. On `body` both palettes are in scope, so each
+ * token resolves in whichever one is active, which is what DESIGN.md's
+ * "Tokens derivados" asks for: "resuelven solos en ambos temas".
+ */
+body {
+  /* Soft semantic backgrounds */
+  --ok-bg: color-mix(in srgb, var(--ok) 12%, var(--surface));
+  --warn-bg: color-mix(in srgb, var(--warn) 12%, var(--surface));
+  --danger-bg: color-mix(in srgb, var(--danger) 12%, var(--surface));
+  /* Table/row hover surface */
+  --surface2: color-mix(in srgb, var(--bg) 60%, var(--surface));
 }
 
 *,
@@ -221,6 +237,23 @@ a {
 .lx-btn-secondary:hover:not(:disabled) {
   border-color: var(--navy-fg);
   color: var(--navy-fg);
+}
+
+/*
+ * Text button — DESIGN.md "Reglas": "Una acción primaria (navy) por vista; el
+ * resto secundarias o de texto". The section "Componentes" describes only the
+ * primary and secondary fills, so the treatment below is DERIVED: no border and
+ * no fill at rest, brand foreground for the label, and --cyan-soft on hover,
+ * the token DESIGN.md already assigns to "hover de selección".
+ */
+.lx-btn-text {
+  padding-inline: 10px;
+  background: transparent;
+  color: var(--navy-fg);
+}
+
+.lx-btn-text:hover:not(:disabled) {
+  background: var(--cyan-soft);
 }
 
 /*

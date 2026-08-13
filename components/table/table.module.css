@@ -1,0 +1,44 @@
+/* Tablas — DESIGN.md: "encabezado 11px uppercase --muted, filas con borde
+   inferior, hover --surface2". */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-body-sm);
+}
+
+/* The 11px / 700 / uppercase treatment itself comes from the shared .lx-label;
+   only the colour and the spacing are the table's own. */
+.headerCell {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  text-align: start;
+  white-space: nowrap;
+}
+
+.row {
+  transition: background-color 0.12s ease;
+}
+
+.row:hover {
+  background: var(--surface2);
+}
+
+.cell {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  text-align: start;
+  vertical-align: middle;
+}
+
+.headerCell[data-align="end"],
+.cell[data-align="end"] {
+  text-align: end;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row {
+    transition: none;
+  }
+}

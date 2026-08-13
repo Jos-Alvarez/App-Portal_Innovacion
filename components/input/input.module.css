@@ -1,0 +1,57 @@
+/* Inputs — DESIGN.md: "fondo --bg, borde --border, radio 9px, foco cian
+   (outline-color), error = borde rojo + mensaje en --danger-bg". */
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+/*
+ * DERIVED. DESIGN.md styles `.lx-label` for "etiquetas de tipo/estado", not for
+ * form labels, so the field label uses the body scale at the 600 weight the
+ * type section allows instead of borrowing the uppercase treatment.
+ */
+.label {
+  font-size: var(--fs-body-sm);
+  font-weight: 600;
+}
+
+.input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-body);
+  transition: border-color 0.15s ease;
+}
+
+.input::placeholder {
+  color: var(--muted);
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 1px;
+}
+
+/* Same "nunca ocultarlo" rule the disabled button follows. */
+.input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.inputInvalid {
+  border-color: var(--danger);
+}
+
+.error {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 7px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: var(--fs-meta);
+  font-weight: 600;
+}

@@ -1,3 +1,4 @@
+import { Logo } from "@/components/logo/logo";
 import { ThemeToggle } from "@/components/theme-toggle/theme-toggle";
 
 import styles from "./page.module.css";
@@ -7,6 +8,9 @@ export default function HomePage() {
   return (
     <main className={styles.main}>
       <div className={styles.card}>
+        {/* The logo is here so the single-asset dark derivation is exercised by
+            a real route; its own placements are the login and the topbar. */}
+        <Logo preload />
         <p className="lx-label" style={{ color: "var(--navy-fg)" }}>
           Fundación UI
         </p>

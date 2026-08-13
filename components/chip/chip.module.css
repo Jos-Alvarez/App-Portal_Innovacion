@@ -1,0 +1,88 @@
+/*
+ * Chips — DESIGN.md "Componentes". Both kinds are pills and both are
+ * `white-space: nowrap`, per "Todos los botones y chips".
+ *
+ * The soft backgrounds are DERIVED with the same 12% mix DESIGN.md already uses
+ * for --ok-bg / --warn-bg / --danger-bg, so a chip resolves in both palettes
+ * from one token instead of a second list of hexadecimals.
+ */
+.filter,
+.status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+
+/* Chips de filtro: "activo = navy relleno, inactivo = borde + --muted". */
+.filter {
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--fs-body-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.filter:hover:not(:disabled):not([aria-pressed="true"]) {
+  border-color: var(--cyan);
+  color: var(--navy-fg);
+}
+
+.filter[aria-pressed="true"] {
+  border-color: transparent;
+  background: var(--navy);
+  color: var(--on-primary);
+}
+
+.filter:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.filter:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Chips de tipo/estado: fondo suave semántico + texto del mismo tono. */
+.status {
+  padding: 3px 10px;
+  background: color-mix(in srgb, var(--chip-tone) 12%, var(--surface));
+  color: var(--chip-tone);
+}
+
+.status[data-tone="neutral"] {
+  --chip-tone: var(--muted);
+}
+
+/* "info" uses the foreground navy, not the fill: it is text on a soft ground. */
+.status[data-tone="info"] {
+  --chip-tone: var(--navy-fg);
+
+  background: var(--cyan-soft);
+}
+
+.status[data-tone="ok"] {
+  --chip-tone: var(--ok);
+}
+
+.status[data-tone="warn"] {
+  --chip-tone: var(--warn);
+}
+
+.status[data-tone="danger"] {
+  --chip-tone: var(--danger);
+}
+
+.status[data-tone="navy"] {
+  --chip-tone: var(--navy-fg);
+}
+
+.status[data-tone="agent"] {
+  --chip-tone: var(--agent);
+}

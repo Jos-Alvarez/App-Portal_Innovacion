@@ -1,0 +1,54 @@
+/* Switch — DESIGN.md: "44×24px, verde asignado / borde gris sin acceso,
+   knob animado". */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  width: 44px;
+  height: 24px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--bg);
+  cursor: pointer;
+  transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+
+/* "verde asignado" — the fill carries the state, the knob only moves. */
+.switch[aria-checked="true"] {
+  border-color: var(--ok);
+  background: var(--ok);
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.switch:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.knob {
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-pill);
+  /* DERIVED: --surface is white in light mode and dark in dark mode, which
+     would make the knob vanish against the green fill. --on-primary is the
+     one token DESIGN.md fixes as legible on a saturated fill in both themes. */
+  background: var(--on-primary);
+  box-shadow: 0 1px 2px rgb(15 34 68 / 25%);
+  transition: transform 0.18s ease;
+}
+
+.switch[aria-checked="true"] .knob {
+  transform: translateX(20px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch,
+  .knob {
+    transition: none;
+  }
+}

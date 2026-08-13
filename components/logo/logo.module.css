@@ -1,0 +1,35 @@
+/*
+ * Logo — DESIGN.md "Logo", transcribed:
+ *
+ *   "Imagen del logo con `mix-blend-mode: multiply` en claro (elimina el fondo
+ *    blanco del PNG). En oscuro: `mix-blend-mode: screen` + `filter: invert(1)
+ *    hue-rotate(185deg) saturate(1.15) brightness(1.1)` como variante adaptada.
+ *    **En producción reemplazar por SVG transparente + variante oficial dark.**"
+ *
+ * One asset, two palettes. In dark, invert turns the navy ink into a light
+ * cyan, the hue rotation brings it back to a blue that belongs to this palette,
+ * and screen keeps the result sitting on the dark ground.
+ *
+ * Note on the premise: the supplied public/logo.png has no white ground to
+ * remove — it is already RGBA with 80% of its pixels fully transparent. The
+ * treatment is kept exactly as DESIGN.md prescribes it because it still
+ * resolves correctly on transparent pixels (both blend modes leave the backdrop
+ * untouched where alpha is 0), but the stated reason no longer applies.
+ */
+.logo {
+  display: block;
+  height: auto;
+  mix-blend-mode: multiply;
+}
+
+body[data-lx-dark="1"] .logo {
+  mix-blend-mode: screen;
+  filter: invert(1) hue-rotate(185deg) saturate(1.15) brightness(1.1);
+}
+
+/*
+ * mix-blend-mode blends against whatever backdrop the element's stacking
+ * context provides, so an ancestor that isolates itself would neutralise the
+ * treatment above. Nothing here can enforce that from a distance; the shell
+ * simply must not wrap the logo in an isolated or opaquely filled layer.
+ */
