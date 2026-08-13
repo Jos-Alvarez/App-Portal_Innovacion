@@ -1,0 +1,231 @@
+// Portal de Innovación — Lima Expresa.
+// Data model: ADR 0002 (adrs/0002-modelo-datos-tablas-separadas.md).
+// Engine/ownership rules: ADR 0005 — the portal is the sole schema owner and
+// the only component allowed to run migrations against SQL Server.
+//
+// Naming convention: models and fields keep idiomatic Prisma naming
+// (PascalCase models, camelCase fields) for the generated client API, and are
+// mapped with `@@map` / `@map` to the snake_case table and column names that
+// ADR 0002 defines. The database is the contract shared with the read-only
+// FastAPI mirror (ADR 0005), so the physical names must match the ADR exactly.
+//
+// SQL Server limitations that shape this schema:
+//   - Prisma has no native `enum` support on the `sqlserver` provider, so the
+//     five enum-shaped fields are plain strings whose allowed values are
+//     documented inline and enforced in the application layer.
+//   - Prisma has no scalar list support on `sqlserver`, so `formatos_aceptados`
+//     is a delimited string (see the comment on that field).
+//   - Prisma has no `Json` type on `sqlserver`.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "sqlserver"
+  url               = env("DATABASE_URL")
+  // The shadow database is provisioned by hand and declared here so Prisma
+  // Migrate never creates or drops a database on the shared corporate
+  // instance (README.md, operational rule 3).
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+/// Corporate collaborator, upserted from the Entra ID identity (ADR 0009).
+model Usuario {
+  id      Int     @id @default(autoincrement())
+  /// Corporate e-mail: the stable identity key of the upsert (ADR 0009).
+  /// Length not specified by ADR 0002; 320 is the RFC 5321 maximum.
+  correo  String  @unique @db.NVarChar(320)
+  nombre  String  @db.NVarChar(200)
+  /// Sourced from the Entra ID `department` claim, which may be absent.
+  /// ADR 0002 does not specify nullability. Modelled NOT NULL with an empty
+  /// default so the analytics grouping of item #18 never has to branch on NULL:
+  /// every user falls into exactly one area bucket, and the empty string is the
+  /// "no area reported by Entra ID" bucket. Rendering that bucket as "Sin área"
+  /// is the UI's job, not the database's.
+  area    String  @default("") @db.NVarChar(120)
+  esAdmin Boolean @default(false) @map("es_admin")
+  activo  Boolean @default(true)
+
+  asignacionesEnlace     AsignacionEnlace[]
+  asignacionesProcesador AsignacionProcesador[]
+  sugerencias            Sugerencia[]
+  gruposCreados          GrupoSugerencia[]
+  cambiosDeEstado        HistorialSugerencia[]
+  eventos                EventoUso[]
+
+  @@map("usuario")
+}
+
+/// External app or AI agent the portal only links to (ADR 0002).
+model Enlace {
+  id Int @id @default(autoincrement())
+
+  nombre      String  @db.NVarChar(150)
+  /// Optionality not specified by ADR 0002; kept optional.
+  descripcion String? @db.NVarChar(1000)
+  url         String  @db.NVarChar(2048)
+  /// Enum-shaped: "app" | "agente". Stored as a string because Prisma has no
+  /// native enums on SQL Server; validated in the application layer.
+  tipo        String  @db.NVarChar(20)
+  activo      Boolean @default(true)
+
+  asignaciones AsignacionEnlace[]
+
+  @@map("enlace")
+}
+
+/// Internal file processor executed by the FastAPI service (ADR 0006).
+/// This row is the single source of truth for the shape of an execution
+/// (ADR 0002); the Python module never duplicates it.
+model Procesador {
+  id Int @id @default(autoincrement())
+
+  nombre            String  @db.NVarChar(150)
+  /// Optionality not specified by ADR 0002; kept optional.
+  descripcion       String? @db.NVarChar(1000)
+  /// Registry lookup key of the Python module (ADR 0006). Uniqueness is not
+  /// stated by ADR 0002 but is implied by "lookup by key".
+  claveProcesador   String  @unique @map("clave_procesador") @db.NVarChar(100)
+  /// Comma-separated list of lowercase extensions without dots, e.g.
+  /// "xlsx,csv,pdf". Prisma has no scalar lists on SQL Server, so the list is
+  /// flattened into one column; parsing and validation live in the
+  /// application layer. Storage shape not specified by ADR 0002.
+  formatosAceptados String  @map("formatos_aceptados") @db.NVarChar(400)
+  /// Per-file size cap, in bytes (business rule: <= 25 MB). Unit not
+  /// specified by ADR 0002.
+  tamanoMax         Int     @map("tamano_max")
+  /// Minimum number of input files per execution (ADR 0002: int >= 1).
+  entradasMin       Int     @default(1) @map("entradas_min")
+  /// Maximum number of input files per execution; NULL means uncapped.
+  entradasMax       Int?    @map("entradas_max")
+  /// Cap on the compressed sum of the whole request, in bytes; NULL means no
+  /// cap of its own. Unit not specified by ADR 0002.
+  tamanoMaxTotal    Int?    @map("tamano_max_total")
+  /// Enum-shaped: "archivo" | "zip". Declarative for the UI only — the
+  /// pipeline packages by the real output count (ADR 0002).
+  salidaEsperada    String  @map("salida_esperada") @db.NVarChar(20)
+  activo            Boolean @default(true)
+
+  asignaciones AsignacionProcesador[]
+
+  @@map("procesador")
+}
+
+/// Per-user grant over an `enlace`. ADR 0002 lists only the two foreign keys,
+/// so the pair is the primary key: it identifies the row and rules out
+/// duplicate grants without a surrogate id.
+model AsignacionEnlace {
+  usuarioId Int @map("usuario_id")
+  enlaceId  Int @map("enlace_id")
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  enlace  Enlace  @relation(fields: [enlaceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([usuarioId, enlaceId])
+  @@map("asignacion_enlace")
+}
+
+/// Per-user grant over a `procesador`. Same composite-key rationale as
+/// `AsignacionEnlace`.
+model AsignacionProcesador {
+  usuarioId    Int @map("usuario_id")
+  procesadorId Int @map("procesador_id")
+
+  usuario    Usuario    @relation(fields: [usuarioId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  procesador Procesador @relation(fields: [procesadorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([usuarioId, procesadorId])
+  @@map("asignacion_procesador")
+}
+
+/// Improvement suggestion sent by a collaborator. `estado` holds the current
+/// value only; the full trail lives in `historial_sugerencia` (ADR 0002).
+model Sugerencia {
+  id Int @id @default(autoincrement())
+
+  autorId       Int      @map("autor_id")
+  titulo        String   @db.NVarChar(200)
+  /// Free-form body; no length specified by ADR 0002, so it is unbounded.
+  descripcion   String   @db.NVarChar(Max)
+  /// Target area, chosen by the author (PRD: own area or another one).
+  /// Free text, like `usuario.area`. Length not specified by ADR 0002.
+  areaDestino   String   @map("area_destino") @db.NVarChar(120)
+  /// Enum-shaped: "pendiente" | "en_revision" | "aprobada" | "rechazada" |
+  /// "implementada". Default not specified by ADR 0002; "pendiente" is the
+  /// entry state of the funnel described in TECH-DESIGN.md.
+  estado        String   @default("pendiente") @db.NVarChar(20)
+  grupoId       Int?     @map("grupo_id")
+  /// Creation timestamp ("fecha de creación" in ADR 0002); the concrete
+  /// column name and default are not specified there.
+  fechaCreacion DateTime @default(now()) @map("fecha_creacion") @db.DateTime2
+
+  autor     Usuario               @relation(fields: [autorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  grupo     GrupoSugerencia?      @relation(fields: [grupoId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  historial HistorialSugerencia[]
+
+  @@map("sugerencia")
+}
+
+/// Bucket the admin uses to group similar or duplicate suggestions (ADR 0002).
+model GrupoSugerencia {
+  id Int @id @default(autoincrement())
+
+  titulo    String @db.NVarChar(200)
+  creadoPor Int    @map("creado_por")
+
+  creador     Usuario      @relation(fields: [creadoPor], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  sugerencias Sugerencia[]
+
+  @@map("grupo_sugerencia")
+}
+
+/// Immutable ledger: one row per state transition of a suggestion (ADR 0002).
+model HistorialSugerencia {
+  id Int @id @default(autoincrement())
+
+  sugerenciaId   Int      @map("sugerencia_id")
+  /// NULL for the entry row of a suggestion that has no previous state.
+  /// Nullability not specified by ADR 0002.
+  estadoAnterior String?  @map("estado_anterior") @db.NVarChar(20)
+  estadoNuevo    String   @map("estado_nuevo") @db.NVarChar(20)
+  cambiadoPor    Int      @map("cambiado_por")
+  /// Default not specified by ADR 0002.
+  fechaCambio    DateTime @default(now()) @map("fecha_cambio") @db.DateTime2
+
+  sugerencia Sugerencia @relation(fields: [sugerenciaId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  autor      Usuario    @relation(fields: [cambiadoPor], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("historial_sugerencia")
+}
+
+/// Usage event feeding the analytics screen (ADR 0010).
+///
+/// `tipoRecurso` + `idRecurso` is a polymorphic reference on purpose: ADR 0002
+/// accepts that the database cannot validate it with a foreign key, and the
+/// application layer guarantees its integrity. Do not add relations to
+/// `Enlace` or `Procesador` here.
+model EventoUso {
+  id Int @id @default(autoincrement())
+
+  usuarioId   Int      @map("usuario_id")
+  /// Enum-shaped: "enlace" | "procesador".
+  tipoRecurso String   @map("tipo_recurso") @db.NVarChar(20)
+  /// Id of the referenced `enlace` or `procesador` row. No foreign key.
+  idRecurso   Int      @map("id_recurso")
+  /// Enum-shaped: "apertura" | "ejecucion" | "error_formato" |
+  /// "error_tamano" | "error_contenido".
+  tipoEvento  String   @map("tipo_evento") @db.NVarChar(30)
+  /// Default not specified by ADR 0002.
+  fecha       DateTime @default(now()) @db.DateTime2
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  // Indexes derived from the analytics access patterns of ADR 0010; every
+  // query is bounded by a date range, so `fecha` closes each composite.
+  @@index([fecha])
+  @@index([tipoRecurso, idRecurso, fecha])
+  @@index([usuarioId, fecha])
+  @@index([tipoEvento, fecha])
+  @@map("evento_uso")
+}

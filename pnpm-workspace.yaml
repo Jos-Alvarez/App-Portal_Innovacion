@@ -1,6 +1,10 @@
 # pnpm 11 reads settings from here, not from a "pnpm" field in package.json.
-# Both ship platform binaries via postinstall: esbuild for Vitest,
-# unrs-resolver for the ESLint import resolver.
+# These packages ship platform binaries via postinstall: esbuild for Vitest,
+# unrs-resolver for the ESLint import resolver, and the Prisma packages for the
+# Rust query/migration engines and the generated client.
 allowBuilds:
+  '@prisma/client': true
+  '@prisma/engines': true
   esbuild: true
+  prisma: true
   unrs-resolver: true

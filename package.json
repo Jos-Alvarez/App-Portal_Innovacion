@@ -10,9 +10,19 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "postinstall": "prisma generate",
+    "prisma": "dotenv -e .env.local -- prisma",
+    "db:generate": "prisma generate",
+    "db:validate": "dotenv -e .env.local -- prisma validate",
+    "db:format": "prisma format",
+    "db:migrate:create": "dotenv -e .env.local -- prisma migrate dev --create-only",
+    "db:migrate:apply": "dotenv -e .env.local -- prisma migrate deploy",
+    "db:migrate:status": "dotenv -e .env.local -- prisma migrate status",
+    "db:studio": "dotenv -e .env.local -- prisma studio"
   },
   "dependencies": {
+    "@prisma/client": "^6.19.3",
     "next": "16.3.0",
     "react": "19.2.0",
     "react-dom": "19.2.0"
@@ -25,9 +35,11 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.4",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.0",
     "jsdom": "^26.1.0",
+    "prisma": "^6.19.3",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   }
