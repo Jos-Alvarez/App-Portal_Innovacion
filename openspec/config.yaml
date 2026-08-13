@@ -1,0 +1,45 @@
+# openspec/config.yaml
+schema: spec-driven
+
+context: |
+  Project: Portal de Innovación — Lima Expresa (documentation-only repo today).
+  Intended stack: Next.js + TypeScript portal (Prisma/SQL Server, Auth.js/Entra ID)
+  and a separate FastAPI + Python processors service (ADR 0001, 0004, 0005, 0006, 0009).
+  No application code scaffolded yet; first code item is Backlog #0/#1.
+  Testing: no runner established yet; adopt per-repo defaults when scaffolding starts.
+  Style: RFC 2119 keywords in specs; MADR-format ADRs already in adrs/.
+
+strict_tdd: true
+
+testing:
+  test_command: "none-yet"
+  note: "No test runner exists yet. This repo is documentation-only (PRD.md, TECH-DESIGN.md, adrs/, BACKLOG.md). Establish the test command when the first code item (Backlog #0/#1) is scaffolded, per the target repo's stack (Next.js/Vitest or Jest for the portal; pytest for the FastAPI processors service)."
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+    - Reference the relevant BACKLOG.md item number and its dependencies
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+    - Cross-reference the relevant ADR(s) when a decision constrains the spec
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+    - Stay consistent with adrs/ and TECH-DESIGN.md; propose a new ADR if a decision changes
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+    - Strict TDD is enabled: write failing tests before implementation once a test runner exists
+  apply:
+    guidelines:
+      - Follow existing code patterns once scaffolded
+      - Respect the two-repository split (portal vs. processors) from ADR 0001
+    tdd: true
+    test_command: "none-yet"
+  verify:
+    test_command: "none-yet"
+    build_command: "none-yet"
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
