@@ -79,16 +79,31 @@ pnpm test
 
 ### Generar SQL sin tocar la base del portal
 
-El único comando que produce el SQL **sin escribir en la base del portal** es `migrate diff`. Usa la
-base shadow como espacio de trabajo —para eso existe— y deja la base del portal intacta:
+El único comando que produce el SQL **sin escribir en la base del portal** es `migrate diff`:
 
 ```bash
 pnpm prisma migrate diff \
-  --from-migrations ./prisma/migrations \
+  --from-schema-datasource ./prisma/schema.prisma \
   --to-schema-datamodel ./prisma/schema.prisma \
-  --shadow-database-url "<SHADOW_DATABASE_URL>" \
   --script
 ```
+
+Lee el estado **actual de la base** como origen y el `schema.prisma` como destino, y emite la
+diferencia. Es una lectura: no escribe en la base del portal ni en la shadow.
+
+> **Corrección.** Una versión anterior de esta sección usaba `--from-migrations ./prisma/migrations`
+> con `--shadow-database-url`. **Ese comando no funciona en este proyecto**: falla con
+> `` `mssql` is not a supported connector ``, porque `--from-migrations` necesita replayar el
+> historial en una base shadow y esa vía no soporta el conector de SQL Server. Comprobado al generar
+> la migración `enlace_nombre_unico` del ítem #5. La variante `--from-schema-datasource` de arriba sí
+> funciona y cumple la misma garantía de no escribir.
+
+**Si `migrate dev --create-only` aborta.** En un entorno no interactivo, Prisma se niega a generar
+una migración que arrastre un warning —por ejemplo, agregar una restricción `UNIQUE` sobre una
+columna con datos— y sale sin escribir ni aplicar nada. Es seguro: no deja estado a medias.
+La salida es generar el SQL con el `migrate diff` de arriba y crear la carpeta de migración a mano,
+con el formato `<timestamp>_<nombre>/migration.sql`. `migrate status` la reconoce como pendiente y
+`migrate deploy` la aplica con normalidad.
 
 `--shadow-database-url` exige el valor literal; no lee la variable del schema. Tomarlo de
 `.env.local` y **no** dejarlo escrito en ningún archivo versionado. La salida se revisa, y recién
