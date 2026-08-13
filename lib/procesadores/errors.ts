@@ -54,11 +54,11 @@ const MENSAJES_POR_CAMPO: Record<string, { codigo: string; mensaje: string }> = 
   },
   entradasMax: {
     codigo: "entradas_max_invalida",
-    mensaje: "El máximo de archivos debe ser uno o más. Déjalo vacío si no quieres poner tope.",
+    mensaje: "El máximo de archivos debe ser uno o más. Para no poner tope, quita el máximo.",
   },
   tamanoMaxTotal: {
     codigo: "tamano_max_total_invalido",
-    mensaje: "El tamaño máximo del conjunto debe ser mayor que cero. Déjalo vacío si no quieres tope.",
+    mensaje: "El tamaño máximo del conjunto debe ser mayor que cero. Para no poner tope, quita el límite del conjunto.",
   },
   salidaEsperada: {
     codigo: "salida_esperada_invalida",
