@@ -44,7 +44,13 @@ Estos tokens se nombran arriba pero no tienen valor literal propio: se derivan d
 - Texto de UI nunca por debajo de 11px.
 
 ## Logo
-- Imagen del logo con `mix-blend-mode: multiply` en claro (elimina el fondo blanco del PNG).
+- Imagen del logo con `mix-blend-mode: multiply` en claro.
+  > **Corrección.** Una versión anterior de esta línea justificaba el `multiply` diciendo que
+  > "elimina el fondo blanco del PNG". **El archivo entregado (`public/logo.png`) ya es RGBA con
+  > fondo transparente** — un 80,3 % de sus píxeles están en alfa 0 —, así que no hay fondo blanco
+  > que eliminar. El tratamiento se mantiene porque sigue siendo correcto: donde el alfa es 0 el
+  > blend no altera nada, y sobre la superficie clara integra la tinta sin recuadro. Lo que ya no
+  > aplica es el motivo, no la regla.
 - En oscuro: `mix-blend-mode: screen` + `filter: invert(1) hue-rotate(185deg) saturate(1.15) brightness(1.1)` como variante adaptada. **En producción reemplazar por SVG transparente + variante oficial dark.**
 - Presencia: login (132px, centrado) y topbar (58px + separador vertical + "Portal de Innovación").
 
