@@ -1,0 +1,6 @@
+# pnpm 11 reads settings from here, not from a "pnpm" field in package.json.
+# Both ship platform binaries via postinstall: esbuild for Vitest,
+# unrs-resolver for the ESLint import resolver.
+allowBuilds:
+  esbuild: true
+  unrs-resolver: true

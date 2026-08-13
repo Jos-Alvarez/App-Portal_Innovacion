@@ -1,0 +1,256 @@
+/*
+ * Design tokens — Portal de Innovación Lima Expresa.
+ * Values transcribed from DESIGN.md. The dark palette is selected by
+ * `body[data-lx-dark="1"]`, the mechanism DESIGN.md fixes.
+ *
+ * Tokens marked DERIVED are named by DESIGN.md but given no literal value
+ * there; they are computed from the stated colors instead of invented.
+ */
+
+:root {
+  /* Brand */
+  --navy: #1a4293;
+  --navy-deep: #0e2c6b;
+  /*
+   * --navy is the primary-button FILL; --navy-fg is navy used as a FOREGROUND
+   * (brand text, active navigation, secondary-button hover). They are separate
+   * because one value cannot serve both roles at AA in dark mode: passing 4.5:1
+   * as text on --surface needs luminance >= 0.2373, while keeping white legible
+   * on top of it needs <= 0.1833. That window is empty, so the token is split.
+   * In light mode both roles are satisfied by the same value (9.36:1 on
+   * --surface), so --navy-fg simply mirrors --navy here.
+   */
+  --navy-fg: #1a4293;
+  --cyan: #2aa7ce;
+  --cyan-soft: #e3f4fa;
+  --agent: #7a4fb0;
+
+  /* Semantic */
+  --danger: #d2372c;
+  --ok: #1e7b4f;
+  --warn: #8a6116;
+
+  /* DESIGN.md "Botón primario: navy, texto blanco". White clears AA on both
+     navy pairs (9.33:1 light, 5.06:1 dark), so one token serves both themes. */
+  --on-primary: #ffffff;
+
+  /* Cool neutrals */
+  --bg: #f2f5fa;
+  --surface: #ffffff;
+  --border: #d8e0ec;
+  --text: #0f2244;
+  --muted: #5d6b84;
+
+  /* DERIVED — soft semantic backgrounds */
+  --ok-bg: color-mix(in srgb, var(--ok) 12%, var(--surface));
+  --warn-bg: color-mix(in srgb, var(--warn) 12%, var(--surface));
+  --danger-bg: color-mix(in srgb, var(--danger) 12%, var(--surface));
+  /* DERIVED — table/row hover surface */
+  --surface2: color-mix(in srgb, var(--bg) 60%, var(--surface));
+  /* DERIVED — the "sombra doble suave" of DESIGN.md */
+  --shadow: 0 1px 2px rgb(15 34 68 / 6%), 0 8px 24px rgb(15 34 68 / 8%);
+
+  --overlay: rgb(8 16 32 / 45%);
+
+  /* Radii */
+  --radius-card: 14px;
+  --radius-control: 9px;
+  --radius-pill: 999px;
+
+  /* Type scale */
+  --font-sans: var(--font-archivo), system-ui, -apple-system, sans-serif;
+  --fs-title: 24px;
+  --fw-title: 800;
+  --ls-title: -0.01em;
+  --fs-body: 14px;
+  --fs-body-sm: 13.5px;
+  --fs-meta: 12px;
+  --fs-label: 11px;
+  --fw-label: 700;
+  --ls-label: 0.06em;
+}
+
+/*
+ * Dark pairs.
+ *
+ * DESIGN.md defines dark variants for --navy, --cyan, --cyan-soft and --danger
+ * only. It leaves --ok, --warn and --agent without a dark counterpart, and their
+ * light values fail WCAG AA against the dark surface (#121f37): 3.13, 2.98 and
+ * 2.80 respectively. The three values below were computed to restore AA, keeping
+ * each token's original hue and landing in the same contrast band --danger
+ * already occupies (6.13), so the semantic family reads as one system.
+ *
+ * Contrast ratios against --surface #121f37 / --bg #0b1424:
+ *   --ok    #35b87c  6.50 / 7.28
+ *   --warn  #cf9330  6.16 / 6.90
+ *   --agent #ab8bd8  5.81 / 6.51
+ * All exceed the 4.5:1 AA threshold for normal text with headroom.
+ */
+body[data-lx-dark="1"] {
+  --navy: #3e6bc9;
+  --navy-deep: #5b85db;
+  /* Foreground navy — 5.48:1 on --surface, 6.14:1 on --bg. The fill value
+     #3e6bc9 reaches only 3.25:1 as text, which fails AA. Hover stays
+     --navy-deep #5b85db, which clears AA as text at 4.56:1. */
+  --navy-fg: #6d95dd;
+  --cyan: #4cc3e4;
+  --cyan-soft: #12314a;
+
+  --danger: #f07c72;
+  --ok: #35b87c;
+  --warn: #cf9330;
+  --agent: #ab8bd8;
+
+  --bg: #0b1424;
+  --surface: #121f37;
+  --border: #26375a;
+  --text: #e8eef9;
+  --muted: #93a2be;
+
+  /* Deeper shadow in dark, per DESIGN.md */
+  --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 10px 28px rgb(0 0 0 / 45%);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  font-weight: 400;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1 {
+  margin: 0;
+  font-size: var(--fs-title);
+  font-weight: var(--fw-title);
+  letter-spacing: var(--ls-title);
+}
+
+a {
+  color: var(--cyan);
+}
+
+/* Metadatos: 11.5–12.5px en --muted */
+.lx-meta {
+  font-size: var(--fs-meta);
+  color: var(--muted);
+}
+
+/* Etiquetas de tipo/estado: 10.5–11px / 700 / uppercase */
+.lx-label {
+  font-size: var(--fs-label);
+  font-weight: var(--fw-label);
+  text-transform: uppercase;
+  letter-spacing: var(--ls-label);
+}
+
+/* Announced by screen readers, invisible on screen. */
+.lx-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/*
+ * Buttons — DESIGN.md "Componentes". These are the shared classes, not a
+ * component: Slice 3's <Button /> will wrap exactly these, so the styling
+ * lives in one place and nothing is duplicated when it lands.
+ */
+.lx-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  font: inherit;
+  font-size: var(--fs-body-sm);
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.lx-btn:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+/* "Deshabilitado: opacity .5 + cursor not-allowed (nunca ocultarlo)." */
+.lx-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.lx-btn-primary {
+  background: var(--navy);
+  color: var(--on-primary);
+}
+
+.lx-btn-primary:hover:not(:disabled) {
+  background: var(--navy-deep);
+}
+
+.lx-btn-secondary {
+  border-color: var(--border);
+  background: transparent;
+  color: var(--text);
+}
+
+.lx-btn-secondary:hover:not(:disabled) {
+  border-color: var(--navy-fg);
+  color: var(--navy-fg);
+}
+
+/*
+ * Skeleton shimmer — the `lx-shimmer` treatment DESIGN.md names for the Carga
+ * state. A cyan-soft highlight sweeps across the row-hover surface, so it reads
+ * as the same system in both palettes.
+ */
+@keyframes lx-shimmer-sweep {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.lx-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    var(--surface2) 25%,
+    color-mix(in srgb, var(--cyan-soft) 70%, var(--surface2)) 50%,
+    var(--surface2) 75%
+  );
+  background-size: 200% 100%;
+  animation: lx-shimmer-sweep 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lx-shimmer {
+    animation: none;
+  }
+}

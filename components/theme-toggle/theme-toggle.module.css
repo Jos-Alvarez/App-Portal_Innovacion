@@ -1,0 +1,32 @@
+/* Pill toggle with a ☾/☀ glyph, per DESIGN.md "Toggles de tema". */
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-body-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.toggle:hover {
+  border-color: var(--cyan);
+  color: var(--navy-fg);
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.glyph {
+  font-size: 15px;
+  line-height: 1;
+}
