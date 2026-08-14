@@ -7,7 +7,7 @@ import { bytesAMegabytes } from "./edicion";
 /**
  * How the catalogue's vocabulary is written on screen.
  *
- * Same job as `app/admin/enlaces/etiquetas.ts`: `SALIDAS_ESPERADAS` is the
+ * Same job as `lib/enlaces/etiquetas.ts`: `SALIDAS_ESPERADAS` is the
  * stored vocabulary — `archivo`, `zip` — and those are column values, not words
  * a reader should ever see. Keying the records on `SalidaEsperada` is what
  * keeps the promise mechanical: a third value added to the schema stops the

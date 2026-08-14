@@ -15,7 +15,7 @@ import {
   type CrearEnlace,
 } from "@/lib/enlaces/schema";
 
-import { ETIQUETA_TIPO } from "./etiquetas";
+import { ETIQUETA_TIPO } from "@/lib/enlaces/etiquetas";
 import styles from "./enlaces.module.css";
 
 /**

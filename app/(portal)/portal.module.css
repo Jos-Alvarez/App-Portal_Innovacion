@@ -1,0 +1,107 @@
+/*
+ * The collaborator's dashboard. Like the admin screens, nothing here is a new
+ * component: the table, the chips and the empty state are the shared ones, and
+ * this file lays them out and dresses the two things the components layer does
+ * not ship — the topbar lockup DESIGN.md describes as composition, and the
+ * stale-list notice.
+ */
+
+.main {
+  display: grid;
+  gap: 24px;
+  align-content: start;
+  max-width: 1100px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 20px 24px 64px;
+}
+
+/*
+ * DESIGN.md "Logo": "topbar (58px + separador vertical + 'Portal de
+ * Innovación')". The logo component deliberately ships without the lockup — it
+ * is composition — so this is where the three pieces meet.
+ */
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.separador {
+  width: 1px;
+  align-self: stretch;
+  min-height: 28px;
+  background: var(--border);
+}
+
+.marca {
+  font-weight: 700;
+  color: var(--navy-fg);
+}
+
+/* Pushes the identity and the theme toggle to the far end of the bar. */
+.sesion {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.header {
+  display: grid;
+  gap: 6px;
+}
+
+/*
+ * Advertencia, no error: la lista que se ve sigue siendo válida, sólo puede
+ * estar un minuto atrasada. DESIGN.md reserva el rojo para error y destrucción.
+ */
+.aviso {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 7px;
+  background: var(--warn-bg);
+  color: var(--warn);
+  font-size: var(--fs-body-sm);
+  font-weight: 600;
+}
+
+.tabla {
+  padding: 8px 24px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  overflow-x: auto;
+}
+
+.nombre {
+  display: grid;
+  gap: 2px;
+}
+
+.nombreTexto {
+  font-weight: 600;
+}
+
+/*
+ * The procesador's cell. Same box as the "Abrir" anchor beside it so the column
+ * does not jump, but muted and without any of the affordances of a control —
+ * no border, no fill, no pointer.
+ */
+.sinAccion {
+  display: inline-block;
+  padding: 9px 0;
+  color: var(--muted);
+  font-size: var(--fs-body-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.nota {
+  margin: 0;
+  max-width: 70ch;
+}

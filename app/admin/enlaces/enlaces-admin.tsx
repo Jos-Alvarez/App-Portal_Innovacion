@@ -20,7 +20,7 @@ import {
   restaurarEnlace,
   type ResultadoEnlace,
 } from "./enlaces-client";
-import { ETIQUETA_TIPO, TONO_TIPO } from "./etiquetas";
+import { ETIQUETA_TIPO, TONO_TIPO } from "@/lib/enlaces/etiquetas";
 import styles from "./enlaces.module.css";
 
 /**
