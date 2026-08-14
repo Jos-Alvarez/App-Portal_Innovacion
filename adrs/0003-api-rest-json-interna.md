@@ -28,6 +28,23 @@ portal. Rutas principales:
 - CRUD admin: `/api/enlaces`, `/api/procesadores`, `/api/usuarios/{id}/asignaciones`,
   `/api/admins` (alta/revocación de rol, con regla de mínimo 1 administrador)
 - `GET /api/analitica?desde=&hasta=&comparar=` — agregados de uso, adopción, sugerencias y errores
+- `GET /api/mis-recursos` — ya listado arriba; lo consume el dashboard del colaborador (ítem #8)
+- `GET /api/enlaces/{id}/abrir` — **única ruta que no devuelve JSON**: autoriza la asignación, registra el
+  `evento_uso` de tipo `apertura` y responde **302** hacia la URL del enlace
+
+> **Nota sobre la ruta de apertura (ítem #8).** Es la excepción al contrato JSON de este ADR, y se documenta
+> aquí para que no quede como precedente tácito. El motivo es que las dos alternativas fallan: registrar el
+> evento con `await` y después abrir la pestaña pierde la activación transitoria del gesto y el bloqueador de
+> ventanas emergentes la cancela, y un ancla directa a la URL externa no pasa por el backend, de modo que un
+> acceso revocado seguiría abriendo. El 302 es el único camino donde el portal autoriza **antes** de que la
+> navegación ocurra. La excepción se limita a este caso: una ruta `/api/*` que no devuelva JSON necesita una
+> razón igual de concreta.
+>
+> **Límite conocido que esta ruta no resuelve.** Solo cubre el clic que sale del dashboard. Una vez que el
+> colaborador conoce la URL externa —favorito, historial, memoria— esa navegación no pasa por el portal y no
+> hay nada que bloquear. La promesa del ADR 0007 de que "cualquier intento de uso recibe 403" es exacta para
+> `procesador`, cuya ejecución sí atraviesa el backend (ítem #10), y es inaplicable a un `enlace` externo.
+> No es un defecto de implementación: el portal no es dueño del sistema al que apunta.
 
 El contrato lo posee el propio portal (no hay clientes externos); los errores se devuelven como
 JSON con código y mensaje en español apto para mostrarse en la UI (DESIGN.md: lenguaje claro sin
