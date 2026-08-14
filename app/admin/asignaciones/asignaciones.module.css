@@ -1,0 +1,175 @@
+/*
+ * The assignment screens. Nothing here is a new component: the switch, the
+ * table, the status dot and the empty state are the shared ones. This file lays
+ * them out and dresses the two things the components layer does not ship — the
+ * person card and the dimming of a resource dado de baja — with the treatment
+ * DESIGN.md already prescribes for cards and disabled controls.
+ */
+
+.main {
+  display: grid;
+  gap: 24px;
+  align-content: start;
+  max-width: 1100px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 28px 24px 64px;
+}
+
+.header {
+  display: grid;
+  gap: 6px;
+}
+
+/* "Volver" — a text-scale link back to the picker, never a primary action. */
+.volver {
+  justify-self: start;
+  color: var(--navy-fg);
+  font-size: var(--fs-body-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.volver:hover {
+  text-decoration: underline;
+}
+
+.identidad {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.seccion {
+  display: grid;
+  gap: 12px;
+}
+
+.seccionHeader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.seccionTitulo {
+  margin: 0;
+  font-size: var(--fs-body);
+  font-weight: 700;
+}
+
+/* Tarjetas y paneles: --surface + borde 1px + radio 12–16px + --shadow. */
+.tabla {
+  padding: 8px 24px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  overflow-x: auto;
+}
+
+.recurso {
+  display: grid;
+  gap: 2px;
+}
+
+.recursoNombre {
+  font-weight: 600;
+}
+
+/* A resource dado de baja stays legible but visibly idle — the same opacity
+   DESIGN.md gives a disabled control, so "apagado" reads the same everywhere. */
+.recursoNombre[data-baja] {
+  opacity: 0.55;
+}
+
+.acceso {
+  display: inline-grid;
+  gap: 4px;
+  justify-items: end;
+  max-width: 260px;
+}
+
+.nota {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+  text-align: right;
+}
+
+/* Advertencia: ámbar, no rojo — nothing failed and nothing is destroyed. */
+.aviso {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 7px;
+  background: var(--warn-bg);
+  color: var(--warn);
+  font-size: var(--fs-body-sm);
+  font-weight: 600;
+}
+
+/* Error de acción: el rojo solo aparece aquí, nunca decorativo. */
+.alerta {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 7px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: var(--fs-body-sm);
+  font-weight: 600;
+}
+
+/* ── The person picker ─────────────────────────────────────────────────── */
+
+.personas {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+/* Hover de tarjetas interactivas: borde cian + translateY(-2px). */
+.persona {
+  display: grid;
+  gap: 4px;
+  padding: 16px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.18s ease, transform 0.18s ease;
+}
+
+.persona:hover {
+  border-color: var(--cyan);
+  transform: translateY(-2px);
+}
+
+.persona:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.personaNombre {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-weight: 700;
+}
+
+.personaNombre[data-baja] {
+  opacity: 0.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .persona {
+    transition: none;
+  }
+
+  .persona:hover {
+    transform: none;
+  }
+}
