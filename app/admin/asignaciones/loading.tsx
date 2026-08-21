@@ -16,6 +16,8 @@ export default function CargandoAsignaciones() {
       <Skeleton
         label="Cargando la lista de personas"
         blocks={[
+          /* La topbar compartida, que ahora también encabeza esta pantalla. */
+          { width: "100%", height: "44px" },
           { width: "320px", height: "28px" },
           ...Array.from({ length: 6 }, () => ({
             width: "100%",

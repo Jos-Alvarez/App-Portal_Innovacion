@@ -18,6 +18,8 @@ export default function CargandoProcesadores() {
       <Skeleton
         label="Cargando el catálogo de procesadores"
         blocks={[
+          /* La topbar compartida, que ahora también encabeza esta pantalla. */
+          { width: "100%", height: "44px" },
           { width: "300px", height: "28px" },
           { width: "100%", height: "320px", radius: "var(--radius-card)" },
           ...Array.from({ length: 5 }, () => ({ width: "100%", height: "44px" })),

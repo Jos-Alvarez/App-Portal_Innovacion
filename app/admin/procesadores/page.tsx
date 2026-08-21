@@ -1,3 +1,4 @@
+import { Topbar } from "@/components/topbar/topbar";
 import { guardPageAdmin } from "@/lib/authz";
 import { listarProcesadores } from "@/lib/procesadores/repository";
 import { prisma } from "@/lib/prisma";
@@ -40,6 +41,11 @@ export default async function ProcesadoresAdminPage() {
 
   return (
     <main className={styles.main}>
+      {/* La misma barra que el portal: identidad, tema, la puerta al rol y la
+          salida. El logo vuelve al portal, que hasta ahora era el único camino
+          que estas pantallas no tenían. */}
+      <Topbar usuario={acceso.usuario} />
+
       <header className={styles.header}>
         <p className="lx-label" style={{ color: "var(--navy-fg)" }}>
           Administración

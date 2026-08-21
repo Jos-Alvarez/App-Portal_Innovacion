@@ -17,6 +17,8 @@ export default function CargandoSugerenciasAdmin() {
       <Skeleton
         label="Cargando las sugerencias"
         blocks={[
+          /* La topbar compartida, que ahora también encabeza esta pantalla. */
+          { width: "100%", height: "44px" },
           { width: "280px", height: "28px" },
           { width: "100%", height: "32px" },
           ...Array.from({ length: 4 }, () => ({

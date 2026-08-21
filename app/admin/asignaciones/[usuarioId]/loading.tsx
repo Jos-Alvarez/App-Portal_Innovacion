@@ -15,6 +15,8 @@ export default function CargandoAsignacionesDeUsuario() {
       <Skeleton
         label="Cargando los accesos de esta persona"
         blocks={[
+          /* La topbar compartida, que ahora también encabeza esta pantalla. */
+          { width: "100%", height: "44px" },
           { width: "240px", height: "28px" },
           { width: "100%", height: "180px", radius: "var(--radius-card)" },
           { width: "100%", height: "180px", radius: "var(--radius-card)" },

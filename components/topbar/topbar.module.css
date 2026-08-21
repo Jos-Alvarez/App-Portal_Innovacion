@@ -18,6 +18,25 @@
   border-bottom: 1px solid var(--border);
 }
 
+/*
+ * The logo, the separator and the brand behave as one link home, so they are one
+ * flex row rather than three children of the bar. `align-self: stretch` on the
+ * separator needs a stretching parent, which is what the row gives it.
+ */
+.lockup {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--radius-control);
+}
+
+.lockup:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+}
+
 .separador {
   width: 1px;
   align-self: stretch;

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { StatusChip } from "@/components/chip/chip";
 import { EmptyState } from "@/components/states/empty-state";
 import { StatusDot } from "@/components/status-dot/status-dot";
+import { Topbar } from "@/components/topbar/topbar";
 import { guardPageAdmin } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { type UsuarioListadoDTO, listarUsuarios } from "@/lib/usuarios/repository";
@@ -58,6 +59,11 @@ export default async function AsignacionesPage() {
 
   return (
     <main className={styles.main}>
+      {/* La misma barra que el portal: identidad, tema, la puerta al rol y la
+          salida. El logo vuelve al portal, que hasta ahora era el único camino
+          que estas pantallas no tenían. */}
+      <Topbar usuario={acceso.usuario} />
+
       <header className={styles.header}>
         <p className="lx-label" style={{ color: "var(--navy-fg)" }}>
           Administración

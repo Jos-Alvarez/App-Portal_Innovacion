@@ -44,13 +44,16 @@ const USUARIO = {
   procesadores: [],
 };
 
+/** La administradora que mira la pantalla — la topbar dibuja su nombre. */
+const USUARIA = { id: 1, correo: "rosa@limaexpresa.pe", nombre: "Rosa Díaz", esAdmin: true };
+
 function contexto(usuarioId: string) {
   return { params: Promise.resolve({ usuarioId }) };
 }
 
 describe("/admin/asignaciones/[usuarioId]", () => {
   beforeEach(() => {
-    guardPageAdmin.mockReset().mockResolvedValue({ allowed: true, usuario: { id: 1, esAdmin: true } });
+    guardPageAdmin.mockReset().mockResolvedValue({ allowed: true, usuario: USUARIA });
     leerUsuarioConAsignaciones.mockReset().mockResolvedValue(USUARIO);
     listarEnlaces.mockReset().mockResolvedValue([ENLACE]);
     listarProcesadores.mockReset().mockResolvedValue([]);
@@ -92,5 +95,32 @@ describe("/admin/asignaciones/[usuarioId]", () => {
 
     expect(screen.getByText("Esa persona ya no está en el portal")).toBeInTheDocument();
     expect(leerUsuarioConAsignaciones).not.toHaveBeenCalled();
+  });
+
+  /*
+   * The shared bar. It is repeated in every admin page rather than lifted into
+   * `app/admin/layout.tsx`, because Next's Router Cache reuses a layout across
+   * soft navigations and the bar has to be re-rendered by each page's own guard.
+   * Asserting it here is what keeps one of the nine copies from being dropped.
+   */
+  it("wears the shared topbar, with its way back to the portal", async () => {
+    render(await AsignacionesDeUsuarioPage(contexto("7")));
+
+    expect(screen.getByText("Rosa Díaz")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /portal de innovación/i })).toHaveAttribute("href", "/");
+  });
+
+  /*
+   * A stale bookmark lands here, and a screen with no way out is the last place
+   * to drop the bar — which is exactly what happens if the second render path
+   * is forgotten.
+   */
+  it("keeps the bar on the screen that says the person is gone", async () => {
+    leerUsuarioConAsignaciones.mockResolvedValue(null);
+
+    render(await AsignacionesDeUsuarioPage(contexto("404")));
+
+    expect(screen.getByText("Esa persona ya no está en el portal")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /portal de innovación/i })).toHaveAttribute("href", "/");
   });
 });

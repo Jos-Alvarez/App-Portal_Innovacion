@@ -24,6 +24,9 @@ import ProcesadoresAdminPage from "./page";
  * themselves are not re-tested: `lib/authz` already owns those.
  */
 
+/** La administradora que mira la pantalla — la topbar dibuja su nombre. */
+const USUARIA = { id: 1, correo: "rosa@limaexpresa.pe", nombre: "Rosa Díaz", esAdmin: true };
+
 describe("/admin/procesadores", () => {
   beforeEach(() => {
     guardPageAdmin.mockReset();
@@ -41,7 +44,7 @@ describe("/admin/procesadores", () => {
   });
 
   it("shows the whole catalogue to an administrator, bajas included", async () => {
-    guardPageAdmin.mockResolvedValue({ allowed: true, usuario: { id: 1, esAdmin: true } });
+    guardPageAdmin.mockResolvedValue({ allowed: true, usuario: USUARIA });
     listarProcesadores.mockResolvedValue([
       {
         id: 4,
@@ -63,5 +66,21 @@ describe("/admin/procesadores", () => {
     expect(screen.getByRole("heading", { name: /catálogo de procesadores/i })).toBeInTheDocument();
     expect(screen.getByText("Maestro de Excel")).toBeInTheDocument();
     expect(screen.getByText("Dado de baja")).toBeInTheDocument();
+  });
+
+  /*
+   * The shared bar. It is repeated in every admin page rather than lifted into
+   * `app/admin/layout.tsx`, because Next's Router Cache reuses a layout across
+   * soft navigations and the bar has to be re-rendered by each page's own guard.
+   * Asserting it here is what keeps one of the nine copies from being dropped.
+   */
+  it("wears the shared topbar, with its way back to the portal", async () => {
+    guardPageAdmin.mockResolvedValue({ allowed: true, usuario: USUARIA });
+
+    render(await ProcesadoresAdminPage());
+
+    expect(screen.getByText("Rosa Díaz")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /cerrar sesión/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /portal de innovación/i })).toHaveAttribute("href", "/");
   });
 });

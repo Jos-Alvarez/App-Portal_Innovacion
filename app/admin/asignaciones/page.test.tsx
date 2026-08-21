@@ -31,6 +31,9 @@ const ANA = {
   procesadoresAsignados: 1,
 };
 
+/** La administradora que mira la pantalla — la topbar dibuja su nombre. */
+const USUARIA = { id: 1, correo: "rosa@limaexpresa.pe", nombre: "Rosa Díaz", esAdmin: true };
+
 describe("/admin/asignaciones", () => {
   beforeEach(() => {
     guardPageAdmin.mockReset();
@@ -47,7 +50,7 @@ describe("/admin/asignaciones", () => {
   });
 
   it("gives every account its own assignment screen to open", async () => {
-    guardPageAdmin.mockResolvedValue({ allowed: true, usuario: { id: 1, esAdmin: true } });
+    guardPageAdmin.mockResolvedValue({ allowed: true, usuario: USUARIA });
     listarUsuarios.mockResolvedValue([ANA]);
 
     render(await AsignacionesPage());
@@ -59,7 +62,7 @@ describe("/admin/asignaciones", () => {
   });
 
   it("says how much each person already holds, and which accounts are not ordinary ones", async () => {
-    guardPageAdmin.mockResolvedValue({ allowed: true, usuario: { id: 1, esAdmin: true } });
+    guardPageAdmin.mockResolvedValue({ allowed: true, usuario: USUARIA });
     listarUsuarios.mockResolvedValue([
       ANA,
       {
@@ -86,7 +89,7 @@ describe("/admin/asignaciones", () => {
   });
 
   it("explains that accounts appear on their own, because no screen creates one", async () => {
-    guardPageAdmin.mockResolvedValue({ allowed: true, usuario: { id: 1, esAdmin: true } });
+    guardPageAdmin.mockResolvedValue({ allowed: true, usuario: USUARIA });
     listarUsuarios.mockResolvedValue([]);
 
     render(await AsignacionesPage());
@@ -97,5 +100,21 @@ describe("/admin/asignaciones", () => {
         "Las cuentas se crean solas la primera vez que alguien entra al portal con su correo corporativo. Pide a esa persona que inicie sesión una vez y aparecerá aquí para asignarle accesos.",
       ),
     ).toBeInTheDocument();
+  });
+
+  /*
+   * The shared bar. It is repeated in every admin page rather than lifted into
+   * `app/admin/layout.tsx`, because Next's Router Cache reuses a layout across
+   * soft navigations and the bar has to be re-rendered by each page's own guard.
+   * Asserting it here is what keeps one of the nine copies from being dropped.
+   */
+  it("wears the shared topbar, with its way back to the portal", async () => {
+    guardPageAdmin.mockResolvedValue({ allowed: true, usuario: USUARIA });
+
+    render(await AsignacionesPage());
+
+    expect(screen.getByText("Rosa Díaz")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /cerrar sesión/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /portal de innovación/i })).toHaveAttribute("href", "/");
   });
 });

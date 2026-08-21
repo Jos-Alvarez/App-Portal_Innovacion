@@ -37,12 +37,25 @@ import styles from "./topbar.module.css";
  * Server on this request (ADR 0007). Nothing here reads a session token, and
  * there is no role in one to read.
  *
- * NOT A LAYOUT. Putting this in `app/(portal)/layout.tsx` would be the obvious
+ * NOT A LAYOUT. Putting this in `app/(portal)/layout.tsx` — or, now that every
+ * admin screen wears it too, in `app/admin/layout.tsx` — would be the obvious
  * home, and it is the one thing `lib/authz/index.ts` forbids: Next's Router
  * Cache reuses a layout's rendered output across soft navigations, so a role
  * revoked between two screens would keep the administrator button on screen —
  * and, worse, would keep showing a name the database no longer agrees with. As a
  * component rendered by each page, it is re-rendered with each page's own guard.
+ * That is why the same three lines are repeated in nine files rather than
+ * written once: the repetition is the mechanism, not an oversight.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  ON /admin/administradores THE DOOR POINTS AT THE PAGE YOU ARE ON
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * Left as it is, deliberately. Every navigation bar in the world behaves this
+ * way, a reader loses nothing by following it, and the alternative — telling the
+ * bar which route is current — means a prop every page has to pass correctly for
+ * a wart nobody has ever complained about. If the bar ever grows a set of
+ * entries rather than one, that is the moment to add `aria-current`.
  */
 
 export interface TopbarProps {
@@ -64,9 +77,19 @@ export const RUTA_ADMINISTRADORES = "/admin/administradores";
 export function Topbar({ usuario, preloadLogo = false }: TopbarProps) {
   return (
     <div className={styles.topbar}>
-      <Logo size={LOGO_SIZE_TOPBAR} preload={preloadLogo} />
-      <span className={styles.separador} aria-hidden="true" />
-      <span className={styles.marca}>Portal de Innovación</span>
+      {/*
+       * The lockup is the way back to the portal, which is the whole reason the
+       * admin screens can wear this bar at all: before it they had no route home
+       * except the browser's own back button, and `/admin/enlaces` reached by a
+       * bookmark had none whatsoever. A logo that leads home is the convention
+       * every reader already knows, so it needs no label of its own beyond the
+       * two words it already carries.
+       */}
+      <Link className={styles.lockup} href="/">
+        <Logo size={LOGO_SIZE_TOPBAR} preload={preloadLogo} />
+        <span className={styles.separador} aria-hidden="true" />
+        <span className={styles.marca}>Portal de Innovación</span>
+      </Link>
 
       <div className={styles.sesion}>
         {/* The name the guard re-read from SQL Server on this request, not one

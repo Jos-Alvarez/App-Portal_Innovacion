@@ -120,4 +120,20 @@ describe("/admin/administradores", () => {
 
     expect(screen.getByText(/al menos una persona administradora/i)).toBeInTheDocument();
   });
+
+  /*
+   * The shared bar. It is repeated in every admin page rather than lifted into
+   * `app/admin/layout.tsx`, because Next's Router Cache reuses a layout across
+   * soft navigations and the bar has to be re-rendered by each page's own guard.
+   * Asserting it here is what keeps one of the nine copies from being dropped.
+   */
+  it("lleva la topbar compartida, con su camino de vuelta al portal", async () => {
+    guardPageAdmin.mockResolvedValue({ allowed: true, usuario: ADMINISTRADORA });
+
+    render(await AdministradoresPage());
+
+    expect(screen.getByText("Rosa Díaz")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /cerrar sesión/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /portal de innovación/i })).toHaveAttribute("href", "/");
+  });
 });

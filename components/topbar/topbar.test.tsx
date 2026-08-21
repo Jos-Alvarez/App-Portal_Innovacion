@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("next-auth/react", () => ({ signOut: vi.fn() }));
@@ -30,6 +30,20 @@ describe("<Topbar />", () => {
     render(<Topbar usuario={COLABORADORA} />);
 
     expect(screen.getByText("Portal de Innovación")).toBeInTheDocument();
+  });
+
+  /**
+   * The way home, and the reason the admin screens can wear this bar: before it
+   * they had no route back to the portal at all — `/admin/enlaces` reached from
+   * a bookmark left the reader with the browser's back button and nothing else.
+   */
+  it("vuelve al portal desde el logo y la marca, que son un solo enlace", () => {
+    render(<Topbar usuario={COLABORADORA} />);
+
+    const inicio = screen.getByRole("link", { name: /portal de innovación/i });
+
+    expect(inicio).toHaveAttribute("href", "/");
+    expect(within(inicio).getByRole("img")).toBeInTheDocument();
   });
 
   it("deja el cambio de tema al alcance de cualquiera", () => {

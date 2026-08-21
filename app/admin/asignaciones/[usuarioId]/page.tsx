@@ -3,8 +3,9 @@ import Link from "next/link";
 import { StatusChip } from "@/components/chip/chip";
 import { EmptyState } from "@/components/states/empty-state";
 import { StatusDot } from "@/components/status-dot/status-dot";
+import { Topbar } from "@/components/topbar/topbar";
 import { idRutaSchema } from "@/lib/asignaciones/schema";
-import { guardPageAdmin } from "@/lib/authz";
+import { type AuthorizedUsuario, guardPageAdmin } from "@/lib/authz";
 import { listarEnlaces } from "@/lib/enlaces/repository";
 import { prisma } from "@/lib/prisma";
 import { listarProcesadores } from "@/lib/procesadores/repository";
@@ -46,10 +47,16 @@ interface Contexto {
  * "There is no such person", for both ways of getting there: an id that is not
  * a number, and a number that matches no row. To the reader they are the same
  * thing — the link they followed is out of date.
+ *
+ * It takes the reader because it wears the bar too: this is a real screen
+ * somebody can land on from a stale bookmark, and a screen with no way out is
+ * the last place to drop one.
  */
-function PersonaNoEncontrada() {
+function PersonaNoEncontrada({ usuario }: { usuario: AuthorizedUsuario }) {
   return (
     <main className={styles.main}>
+      <Topbar usuario={usuario} />
+
       <header className={styles.header}>
         <Link href="/admin/asignaciones" className={styles.volver}>
           ← Volver a la lista de personas
@@ -77,13 +84,13 @@ export default async function AsignacionesDeUsuarioPage({ params }: Contexto) {
   const id = idRutaSchema.safeParse(usuarioId);
 
   if (!id.success) {
-    return <PersonaNoEncontrada />;
+    return <PersonaNoEncontrada usuario={acceso.usuario} />;
   }
 
   const usuario = await leerUsuarioConAsignaciones(prisma, id.data);
 
   if (usuario === null) {
-    return <PersonaNoEncontrada />;
+    return <PersonaNoEncontrada usuario={acceso.usuario} />;
   }
 
   /* Only now: two catalogues nobody could be assigned from would be two
@@ -95,6 +102,11 @@ export default async function AsignacionesDeUsuarioPage({ params }: Contexto) {
 
   return (
     <main className={styles.main}>
+      {/* La misma barra que el portal: identidad, tema, la puerta al rol y la
+          salida. El «volver» de abajo sigue siendo el camino a la lista; el logo
+          es el camino al portal. */}
+      <Topbar usuario={acceso.usuario} />
+
       <header className={styles.header}>
         <Link href="/admin/asignaciones" className={styles.volver}>
           ← Volver a la lista de personas

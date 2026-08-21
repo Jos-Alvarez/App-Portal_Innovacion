@@ -205,9 +205,12 @@ Deliberately out of scope, and none of them is a gap in the acceptance criteria:
 - **No screen deactivates an account.** `usuario.activo` is still only ever written by the database.
   This item reads it — a deactivated account cannot receive the role, and a deactivated administrator
   is listed so the role can be taken away — but it does not manage it.
-- **The admin screens still have no topbar.** `components/topbar` exists now, and the three portal
-  screens use it; `/admin/*` renders its own header instead, so an administrator returns through the
-  browser. Giving the admin screens a bar of their own is a UI item, not this one.
+- ~~**The admin screens still have no topbar.**~~ **Closed right after this item.** All six `/admin/*`
+  screens now render the same `<Topbar />`, and the lockup became a link to `/` — before it, an
+  administrator who reached `/admin/enlaces` from a bookmark had no route back to the portal at all.
+  The bar is still repeated per page rather than lifted into `app/admin/layout.tsx`, for the reason
+  `lib/authz/index.ts` gives: a layout's output is reused across soft navigations, so a role revoked
+  between two admin screens would leave the door — and the name — on screen.
 - **The `User.Read.All` consent is still an open risk**, exactly as `BACKLOG.md` and `TECH-DESIGN.md`
   record it. The difference is that the portal now behaves correctly on both sides of it, and says
   which side it is on.
