@@ -41,3 +41,26 @@ export const TONO_ESTADO: Record<EstadoSugerencia, ChipTone> = {
   rechazada: "danger",
   implementada: "navy",
 };
+
+/**
+ * One ledger entry, in words.
+ *
+ * The entry with no previous state is the send itself, and it reads as an event
+ * rather than as a transition — "Enviada" — because "→ Pendiente" with nothing
+ * on the left is a sentence about the database, not about what happened.
+ *
+ * It lives here rather than beside a screen because BOTH screens render the same
+ * ledger: item #13's author reading their own trail and item #15's administrator
+ * reading the one they are about to add to. Two copies would eventually word one
+ * transition differently on the two screens that show the very same row.
+ */
+export function textoDeAsiento(asiento: {
+  estadoAnterior: EstadoSugerencia | null;
+  estadoNuevo: EstadoSugerencia;
+}): string {
+  const destino = ETIQUETA_ESTADO[asiento.estadoNuevo];
+
+  return asiento.estadoAnterior === null
+    ? `Enviada · ${destino}`
+    : `${ETIQUETA_ESTADO[asiento.estadoAnterior]} → ${destino}`;
+}

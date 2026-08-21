@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { ETIQUETA_ESTADO, TONO_ESTADO } from "./etiquetas";
+import { ETIQUETA_ESTADO, TONO_ESTADO, textoDeAsiento } from "./etiquetas";
 import { ESTADOS_SUGERENCIA } from "./schema";
 
 /**
@@ -53,5 +53,53 @@ describe("TONO_ESTADO", () => {
     for (const estado of ESTADOS_SUGERENCIA) {
       expect(TONO_ESTADO[estado]).toBeTruthy();
     }
+  });
+});
+
+/**
+ * Un asiento del historial, en palabras.
+ *
+ * It moved down here from `buzon.tsx` in item #15 because a second screen now
+ * renders the same ledger. These tests are what stop the two screens from ever
+ * wording one transition differently.
+ */
+describe("textoDeAsiento", () => {
+  /**
+   * The entry row reads as an EVENT, not as a transition: "→ Pendiente" with
+   * nothing on the left is a sentence about the database, not about what
+   * happened.
+   */
+  it("llama «Enviada» al asiento de entrada, que no tiene estado anterior", () => {
+    expect(textoDeAsiento({ estadoAnterior: null, estadoNuevo: "pendiente" })).toBe(
+      "Enviada · Pendiente",
+    );
+  });
+
+  it("escribe los dos extremos de una transición real", () => {
+    expect(textoDeAsiento({ estadoAnterior: "pendiente", estadoNuevo: "en_revision" })).toBe(
+      "Pendiente → En revisión",
+    );
+  });
+
+  /** Ningún estado llega crudo a la pantalla: los dos lados pasan por la etiqueta. */
+  it("nunca deja salir un token de almacenamiento", () => {
+    for (const anterior of ESTADOS_SUGERENCIA) {
+      for (const nuevo of ESTADOS_SUGERENCIA) {
+        const texto = textoDeAsiento({ estadoAnterior: anterior, estadoNuevo: nuevo });
+
+        expect(texto).not.toMatch(/en_revision/);
+        expect(texto).toBe(`${ETIQUETA_ESTADO[anterior]} → ${ETIQUETA_ESTADO[nuevo]}`);
+      }
+    }
+  });
+
+  /**
+   * El repositorio permite volver atrás a propósito — ver la nota del embudo —
+   * y el texto tiene que poder contarlo.
+   */
+  it("sabe escribir una vuelta atrás, porque el embudo no es de una sola dirección", () => {
+    expect(textoDeAsiento({ estadoAnterior: "aprobada", estadoNuevo: "en_revision" })).toBe(
+      "Aprobada → En revisión",
+    );
   });
 });

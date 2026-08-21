@@ -6,8 +6,8 @@ import useSWR from "swr";
 import { StatusChip } from "@/components/chip/chip";
 import { EmptyState } from "@/components/states/empty-state";
 import { Toast } from "@/components/toast/toast";
-import { ETIQUETA_ESTADO, TONO_ESTADO } from "@/lib/sugerencias/etiquetas";
-import type { AsientoSugerencia, SugerenciaDTO } from "@/lib/sugerencias/repository";
+import { ETIQUETA_ESTADO, TONO_ESTADO, textoDeAsiento } from "@/lib/sugerencias/etiquetas";
+import type { SugerenciaDTO } from "@/lib/sugerencias/repository";
 import type { CrearSugerencia } from "@/lib/sugerencias/schema";
 
 import { SugerenciaForm } from "./sugerencia-form";
@@ -91,21 +91,6 @@ const VACIO_TITULO = "Todavía no enviaste ninguna sugerencia";
 const VACIO_DESCRIPCION =
   "Este espacio es para tus ideas de mejora, para tu área o para otra. Escribe la primera con el " +
   "formulario de arriba y podrás seguir su estado desde aquí.";
-
-/**
- * One ledger entry, in words.
- *
- * The entry with no previous state is the send itself, and it reads as an event
- * rather than as a transition — "Enviada" — because "→ Pendiente" with nothing
- * on the left is a sentence about the database, not about what happened.
- */
-function textoDeAsiento(asiento: AsientoSugerencia): string {
-  const destino = ETIQUETA_ESTADO[asiento.estadoNuevo];
-
-  return asiento.estadoAnterior === null
-    ? `Enviada · ${destino}`
-    : `${ETIQUETA_ESTADO[asiento.estadoAnterior]} → ${destino}`;
-}
 
 function Tarjeta({ sugerencia }: { sugerencia: SugerenciaDTO }) {
   return (

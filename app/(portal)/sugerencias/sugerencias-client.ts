@@ -202,46 +202,9 @@ export async function enviarSugerencia(datos: CrearSugerencia): Promise<Resultad
 }
 
 /**
- * ══════════════════════════════════════════════════════════════════════════
- *  ONE FIXED TIME ZONE, AND IT IS NOT A SIMPLIFICATION
- * ══════════════════════════════════════════════════════════════════════════
- *
- * The list is rendered on the server and then hydrated in the browser. A date
- * formatted with the ambient zone would be formatted TWICE — once with the
- * server process's zone, once with the reader's — and a suggestion sent at 21:00
- * in Lima is already the next day in UTC. React would find different text in the
- * two renders and report a hydration mismatch, and the reader would watch the
- * date change under them.
- *
- * Pinning the zone makes both renders agree by construction. `America/Lima` is
- * not a default picked for convenience: it is where the company operates, so it
- * is also the zone in which "el martes" means what the reader thinks it means.
- * A traveller sees Lima time, which is the correct answer for a corporate record
- * rather than a compromise.
- *
- * `es-PE` for the same reason, and it fixes the order to día/mes/año regardless
- * of the browser's own locale.
+ * The date helpers moved to `lib/sugerencias/fechas.ts` when item #15 added the
+ * second screen that renders these same rows, and are re-exported here so item
+ * #13's call sites and its suite keep the import they already had. The reasoning
+ * for the fixed zone lives with the definition.
  */
-export const ZONA_HORARIA = "America/Lima";
-
-const FORMATO_FECHA = new Intl.DateTimeFormat("es-PE", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  timeZone: ZONA_HORARIA,
-});
-
-/**
- * An ISO timestamp as a person reads it.
- *
- * An unparseable string comes back as a dash rather than as "Invalid Date". The
- * date is context around a suggestion, never the point of the screen: it is not
- * worth an exception that blanks the whole list.
- */
-export function formatearFecha(iso: string): string {
-  const fecha = new Date(iso);
-
-  return Number.isNaN(fecha.getTime()) ? "—" : FORMATO_FECHA.format(fecha);
-}
+export { ZONA_HORARIA, formatearFecha } from "@/lib/sugerencias/fechas";
