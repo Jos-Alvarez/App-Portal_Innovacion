@@ -94,6 +94,58 @@ export async function listarProcesadores(client: ProcesadoresClient): Promise<Pr
 }
 
 /**
+ * One row, or `null` when there is no such row.
+ *
+ * The execution screen of item #10 is what needs this: it builds the upload
+ * form out of the contract columns — how many files, which formats, what size —
+ * so the reader is told the rules before they pick a file rather than after the
+ * service refuses one. ADR 0002 is explicit that the row is the only source of
+ * that truth, so the screen reads the row and never a constant of its own.
+ *
+ * The whole DTO and not a narrower select: the screen shows the name and the
+ * description as its heading, `salida_esperada` as its announcement of what
+ * will be downloaded, and every contract column. That is `SELECT_DTO` minus
+ * nothing worth the second projection.
+ *
+ * No `where` on `activo`, matching `listarProcesadores`: whether a deactivated
+ * procesador is reachable is the authorization guard's decision, and it already
+ * refuses a grant whose resource has `activo = false`. A repository that
+ * second-guessed it would turn one denial into two different screens.
+ */
+export async function leerProcesador(
+  client: ProcesadoresClient,
+  id: number,
+): Promise<ProcesadorDTO | null> {
+  const fila = await client.procesador.findUnique({ where: { id }, select: SELECT_DTO });
+
+  return fila ? toDTO(fila) : null;
+}
+
+/**
+ * The registry key of one row, or `null` when there is no such row.
+ *
+ * The execution proxy's whole read. It resolves `clave_procesador` to build the
+ * internal URL — the step ADR 0006 assigns to the portal so "la UI no conoce la
+ * topología del servicio" — and needs nothing else: the service enforces the
+ * contract columns itself, from its own copy, and a portal that re-read them
+ * here would be checking a rule it does not apply.
+ *
+ * One column, like `leerUrlDeEnlace`, and for the same reason: this runs in
+ * front of a person waiting with a file, and the row is not otherwise wanted.
+ */
+export async function leerClaveProcesador(
+  client: ProcesadoresClient,
+  id: number,
+): Promise<string | null> {
+  const fila = await client.procesador.findUnique({
+    where: { id },
+    select: { claveProcesador: true },
+  });
+
+  return fila ? fila.claveProcesador : null;
+}
+
+/**
  * The four contract columns of one row, or `null` when there is no such row.
  *
  * This read exists for `PATCH`, which cannot judge ADR 0002's cross-field rules
