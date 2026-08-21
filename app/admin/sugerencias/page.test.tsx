@@ -12,6 +12,8 @@ vi.mock("@/lib/sugerencias/repository", () => ({
   listarSugerenciasDeAutor: (...args: unknown[]) => listarSugerenciasDeAutor(...args),
 }));
 
+import type { SugerenciaAdminDTO } from "@/lib/sugerencias/repository";
+
 import SugerenciasAdminPage, { dynamic } from "./page";
 
 /**
@@ -25,7 +27,13 @@ import SugerenciasAdminPage, { dynamic } from "./page";
 
 const CREADA = "2026-08-21T14:30:00.000Z";
 
-const SUGERENCIA = {
+/*
+ * Typed, and not a bare object literal. It was untyped once and a missing
+ * `grupo` key reached the render as `undefined` — a value the DTO forbids — where
+ * the compiler should have caught it. A fixture that does not have to satisfy the
+ * contract is a fixture that can drift away from it.
+ */
+const SUGERENCIA: SugerenciaAdminDTO = {
   id: 31,
   titulo: "Tablero de peajes",
   descripcion: "Ver el flujo por caseta sin exportar a Excel.",
@@ -33,6 +41,7 @@ const SUGERENCIA = {
   estado: "pendiente",
   fechaCreacion: CREADA,
   autor: { nombre: "Ana Quispe", area: "Peajes" },
+  grupo: null,
   historial: [
     {
       id: 90,

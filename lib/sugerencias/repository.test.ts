@@ -1,14 +1,16 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
 
-import { TransicionRechazada } from "./errors";
-import type { SugerenciasAdminClient, SugerenciasClient } from "./repository";
+import { AgrupacionRechazada, TransicionRechazada } from "./errors";
+import type { GruposClient, SugerenciasAdminClient, SugerenciasClient } from "./repository";
 import {
   cambiarEstadoSugerencia,
+  crearGrupoSugerencias,
   crearSugerencia,
   leerAreaDelAutor,
   listarSugerencias,
   listarSugerenciasDeAutor,
+  quitarSugerenciaDeGrupo,
 } from "./repository";
 import { ESTADOS_SUGERENCIA } from "./schema";
 
@@ -292,6 +294,7 @@ const REVISADA = new Date("2026-08-22T09:15:00.000Z");
 const FILA_ADMIN = {
   ...FILA,
   autor: { nombre: "Ana Quispe", area: "Operaciones" },
+  grupo: null,
 };
 
 /**
@@ -618,5 +621,340 @@ describe("cambiarEstadoSugerencia", () => {
     const { data } = updateMany.mock.calls[0]?.[0] as { data: { estado: string } };
 
     expect(ESTADOS_SUGERENCIA).toContain(data.estado);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+ *  ÍTEM #16 — LA AGRUPACIÓN
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * El doble del cliente de agrupación.
+ *
+ * `miembrosPorGrupo` is what makes the dissolution testable without a database:
+ * it is what `count` answers per group AFTER the write, which is the only moment
+ * `disolverGruposSinMinimo` asks.
+ */
+function gruposDouble({
+  seleccionadas = [{ id: 7, grupoId: null }, { id: 12, grupoId: null }] as {
+    id: number;
+    grupoId: number | null;
+  }[],
+  miembrosPorGrupo = {} as Record<number, number>,
+  actual = { grupoId: 5 } as { grupoId: number | null } | null,
+} = {}) {
+  const findMany = vi.fn(async (args?: { where?: unknown }) =>
+    /* The `where` tells the two reads apart: the selection has one, the final
+       list read does not. */
+    args?.where === undefined ? [FILA_ADMIN] : seleccionadas,
+  );
+  const findUnique = vi.fn(async (_args: unknown) => actual);
+  const count = vi.fn(async (args: { where: { grupoId: number } }) =>
+    miembrosPorGrupo[args.where.grupoId] ?? 0,
+  );
+  const updateMany = vi.fn(async (_args: unknown) => ({ count: seleccionadas.length }));
+  const update = vi.fn(async (_args: unknown) => ({ id: 7 }));
+
+  const crearGrupo = vi.fn(async (_args: unknown) => ({ id: 42 }));
+  const borrarGrupo = vi.fn(async (_args: unknown) => ({ id: 0 }));
+
+  const transaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
+    fn({
+      sugerencia: { findMany, findUnique, count, updateMany, update },
+      grupoSugerencia: { create: crearGrupo, delete: borrarGrupo },
+    }),
+  );
+
+  const client = {
+    sugerencia: { findMany, findUnique, count, updateMany, update },
+    grupoSugerencia: { create: crearGrupo, delete: borrarGrupo },
+    $transaction: transaction,
+  } as unknown as GruposClient;
+
+  return { client, findMany, findUnique, count, updateMany, update, crearGrupo, borrarGrupo, transaction };
+}
+
+/** Los ids de grupo que se pidió borrar. */
+function gruposBorrados(borrarGrupo: ReturnType<typeof vi.fn>): number[] {
+  return borrarGrupo.mock.calls.map((call) => (call[0] as { where: { id: number } }).where.id);
+}
+
+describe("crearGrupoSugerencias", () => {
+  it("crea el grupo con el título y con quien lo creó", async () => {
+    const { client, crearGrupo } = gruposDouble();
+
+    await crearGrupoSugerencias(client, "Tableros de peajes", [7, 12], 3);
+
+    expect(crearGrupo.mock.calls[0]?.[0]).toEqual({
+      data: { titulo: "Tableros de peajes", creadoPor: 3 },
+    });
+  });
+
+  it("mueve todas las elegidas al grupo nuevo, en una sola escritura", async () => {
+    const { client, updateMany } = gruposDouble();
+
+    await crearGrupoSugerencias(client, "Peajes", [7, 12], 3);
+
+    expect(updateMany.mock.calls[0]?.[0]).toEqual({
+      where: { id: { in: [7, 12] } },
+      data: { grupoId: 42 },
+    });
+  });
+
+  it("hace todo dentro de una sola transacción", async () => {
+    const { client, transaction } = gruposDouble();
+
+    await crearGrupoSugerencias(client, "Peajes", [7, 12], 3);
+
+    expect(transaction).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   *  AGRUPAR NO TOCA EL ESTADO NI ESCRIBE UN ASIENTO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * TECH-DESIGN.md pide que las agrupadas "conserven su estado y autor
+   * individuales", y el ADR 0002 define el libro como un asiento por cada
+   * TRANSICIÓN de estado. Archivar una idea en un balde no es una, y el autor
+   * leyendo su propia traza vería una línea sobre un evento que nunca le pasó a
+   * su idea.
+   *
+   * La forma en que esto se hace cumplir es el TIPO: `GruposClient` no tiene
+   * `historialSugerencia`, así que este módulo no puede escribir un asiento
+   * aunque quisiera.
+   */
+  it("no escribe ningún estado", async () => {
+    const { client, updateMany, update } = gruposDouble();
+
+    await crearGrupoSugerencias(client, "Peajes", [7, 12], 3);
+
+    for (const llamada of [...updateMany.mock.calls, ...update.mock.calls]) {
+      expect((llamada[0] as { data: object }).data).not.toHaveProperty("estado");
+    }
+  });
+
+  it("no recibe siquiera el delegate del historial", () => {
+    const { client } = gruposDouble();
+
+    expect(client).not.toHaveProperty("historialSugerencia");
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   *  EL CHEQUEO DE CANTIDAD ES EL QUE IMPORTA
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * `findMany` con `id: { in: ids }` devuelve menos filas en silencio cuando uno
+   * de los ids ya no está: es un filtro, no una búsqueda. Sin comparar las
+   * cantidades, una selección de dos donde una acababa de borrarse crearía un
+   * grupo de un solo miembro — justo el estado que la disolución existe para
+   * evitar, alcanzado por la puerta de adelante.
+   */
+  it("rechaza si alguna de las elegidas ya no existe, sin crear el grupo", async () => {
+    const { client, crearGrupo, updateMany } = gruposDouble({
+      seleccionadas: [{ id: 7, grupoId: null }],
+    });
+
+    await expect(crearGrupoSugerencias(client, "Peajes", [7, 12], 3)).rejects.toMatchObject({
+      motivo: "sugerencias_no_encontradas",
+    });
+
+    expect(crearGrupo).not.toHaveBeenCalled();
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it("es un AgrupacionRechazada, que es lo que revierte la transacción", async () => {
+    const { client } = gruposDouble({ seleccionadas: [] });
+
+    await expect(crearGrupoSugerencias(client, "Peajes", [7, 12], 3)).rejects.toBeInstanceOf(
+      AgrupacionRechazada,
+    );
+  });
+
+  /* ── La disolución ────────────────────────────────────────────────────── */
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   *  UN GRUPO QUE BAJA DEL MÍNIMO SE DISUELVE EN LA MISMA TRANSACCIÓN
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * El schema mantiene la invariante al CREAR. Acá es donde sobrevive después:
+   * sacar una sugerencia de un par deja al sobreviviente solo en un balde con
+   * título, que es una sugerencia con etiqueta dibujada como un grupo.
+   *
+   * Borrar la FILA es lo que libera al sobreviviente: `sugerencia_grupo_id_fkey`
+   * es `ON DELETE SET NULL`, así que no hay un segundo UPDATE ni una ventana en
+   * la que una sugerencia apunte a un grupo que ya no está.
+   */
+  it("disuelve el grupo anterior que quedó con un solo miembro", async () => {
+    const { client, borrarGrupo } = gruposDouble({
+      seleccionadas: [{ id: 7, grupoId: 5 }, { id: 12, grupoId: null }],
+      miembrosPorGrupo: { 5: 1 },
+    });
+
+    await crearGrupoSugerencias(client, "Peajes", [7, 12], 3);
+
+    expect(gruposBorrados(borrarGrupo)).toEqual([5]);
+  });
+
+  /** Cero es la otra forma: los dos miembros de un par se van juntos al grupo nuevo. */
+  it("disuelve también el grupo que quedó sin ningún miembro", async () => {
+    const { client, borrarGrupo } = gruposDouble({
+      seleccionadas: [{ id: 7, grupoId: 5 }, { id: 12, grupoId: 5 }],
+      miembrosPorGrupo: { 5: 0 },
+    });
+
+    await crearGrupoSugerencias(client, "Peajes", [7, 12], 3);
+
+    expect(gruposBorrados(borrarGrupo)).toEqual([5]);
+  });
+
+  it("no toca el grupo anterior que conservó el mínimo", async () => {
+    const { client, borrarGrupo } = gruposDouble({
+      seleccionadas: [{ id: 7, grupoId: 5 }, { id: 12, grupoId: null }],
+      miembrosPorGrupo: { 5: 2 },
+    });
+
+    await crearGrupoSugerencias(client, "Peajes", [7, 12], 3);
+
+    expect(borrarGrupo).not.toHaveBeenCalled();
+  });
+
+  it("revisa cada grupo anterior una sola vez, aunque vinieran varias del mismo", async () => {
+    const { client, count } = gruposDouble({
+      seleccionadas: [
+        { id: 7, grupoId: 5 },
+        { id: 12, grupoId: 5 },
+        { id: 20, grupoId: 9 },
+      ],
+      miembrosPorGrupo: { 5: 3, 9: 3 },
+    });
+
+    await crearGrupoSugerencias(client, "Peajes", [7, 12, 20], 3);
+
+    expect(count).toHaveBeenCalledTimes(2);
+  });
+
+  it("no revisa nada cuando ninguna venía de un grupo", async () => {
+    const { client, count, borrarGrupo } = gruposDouble();
+
+    await crearGrupoSugerencias(client, "Peajes", [7, 12], 3);
+
+    expect(count).not.toHaveBeenCalled();
+    expect(borrarGrupo).not.toHaveBeenCalled();
+  });
+
+  /* ── La respuesta ─────────────────────────────────────────────────────── */
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   *  CONTESTA CON LA LISTA ENTERA, Y NO ES PEREZA
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * `cambiarEstadoSugerencia` contesta con la fila que cambió, porque un cambio
+   * de estado afecta exactamente la fila que nombró quien llamó. Una escritura de
+   * agrupación no: mover una sugerencia fuera de su grupo puede dejar ese grupo
+   * bajo el mínimo, lo que lo borra, lo que anula el `grupo_id` de una sugerencia
+   * QUE NADIE NOMBRÓ — una fila que quien llamó no tiene forma de saber que tiene
+   * que preguntar.
+   */
+  it("devuelve la lista completa releída al final de la transacción", async () => {
+    const { client, findMany } = gruposDouble();
+
+    const lista = await crearGrupoSugerencias(client, "Peajes", [7, 12], 3);
+
+    expect(lista).toHaveLength(1);
+    expect(lista[0]?.id).toBe(31);
+    /* Dos lecturas: la selección (con `where`) y la lista final (sin él). */
+    expect(findMany).toHaveBeenCalledTimes(2);
+    expect(findMany.mock.calls[1]?.[0]).not.toHaveProperty("where");
+  });
+
+  it("trae el grupo de cada sugerencia en el DTO", async () => {
+    const { client, findMany } = gruposDouble();
+
+    await crearGrupoSugerencias(client, "Peajes", [7, 12], 3);
+
+    const select = (findMany.mock.calls[1]?.[0] as { select: Record<string, unknown> }).select;
+
+    expect(select.grupo).toEqual({ select: { id: true, titulo: true } });
+  });
+});
+
+describe("quitarSugerenciaDeGrupo", () => {
+  it("deja la sugerencia sin grupo", async () => {
+    const { client, update } = gruposDouble({ miembrosPorGrupo: { 5: 2 } });
+
+    await quitarSugerenciaDeGrupo(client, 7);
+
+    expect(update.mock.calls[0]?.[0]).toEqual({ where: { id: 7 }, data: { grupoId: null } });
+  });
+
+  /** La sugerencia sobrevive entera: sus palabras, su autor, su estado y su traza. */
+  it("no toca nada más que la pertenencia", async () => {
+    const { client, update } = gruposDouble({ miembrosPorGrupo: { 5: 2 } });
+
+    await quitarSugerenciaDeGrupo(client, 7);
+
+    expect((update.mock.calls[0]?.[0] as { data: object }).data).toEqual({ grupoId: null });
+  });
+
+  it("disuelve el grupo si quedó bajo el mínimo", async () => {
+    const { client, borrarGrupo } = gruposDouble({ miembrosPorGrupo: { 5: 1 } });
+
+    await quitarSugerenciaDeGrupo(client, 7);
+
+    expect(gruposBorrados(borrarGrupo)).toEqual([5]);
+  });
+
+  it("deja el grupo en pie si todavía tiene el mínimo", async () => {
+    const { client, borrarGrupo } = gruposDouble({ miembrosPorGrupo: { 5: 2 } });
+
+    await quitarSugerenciaDeGrupo(client, 7);
+
+    expect(borrarGrupo).not.toHaveBeenCalled();
+  });
+
+  it("rechaza con «sugerencia_no_encontrada» si la fila ya no está", async () => {
+    const { client, update } = gruposDouble({ actual: null });
+
+    await expect(quitarSugerenciaDeGrupo(client, 7)).rejects.toMatchObject({
+      motivo: "sugerencia_no_encontrada",
+    });
+
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Ya estaba suelta. Un 409 y no un éxito silencioso, por la misma razón que se
+   * rechaza la transición al mismo estado: quien llama está actuando sobre una
+   * pantalla que discrepa con la base, y contestar "listo" confirmaría una
+   * suposición en vez de corregirla.
+   */
+  it("rechaza con «sin_grupo» si la sugerencia ya estaba suelta", async () => {
+    const { client, update, borrarGrupo } = gruposDouble({ actual: { grupoId: null } });
+
+    await expect(quitarSugerenciaDeGrupo(client, 7)).rejects.toMatchObject({ motivo: "sin_grupo" });
+
+    expect(update).not.toHaveBeenCalled();
+    expect(borrarGrupo).not.toHaveBeenCalled();
+  });
+
+  it("devuelve la lista completa, porque disolver libera una fila que nadie nombró", async () => {
+    const { client, findMany } = gruposDouble({ miembrosPorGrupo: { 5: 1 } });
+
+    const lista = await quitarSugerenciaDeGrupo(client, 7);
+
+    expect(lista[0]?.id).toBe(31);
+    expect(findMany.mock.calls[0]?.[0]).not.toHaveProperty("where");
+  });
+
+  it("hace todo dentro de una sola transacción", async () => {
+    const { client, transaction } = gruposDouble({ miembrosPorGrupo: { 5: 2 } });
+
+    await quitarSugerenciaDeGrupo(client, 7);
+
+    expect(transaction).toHaveBeenCalledTimes(1);
   });
 });

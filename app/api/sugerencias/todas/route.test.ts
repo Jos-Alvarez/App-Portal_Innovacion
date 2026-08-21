@@ -33,6 +33,7 @@ const FILA = {
   estado: "pendiente",
   fechaCreacion: CREADA,
   autor: { nombre: "Ana Quispe", area: "Peajes" },
+  grupo: null,
   historial: [
     {
       id: 90,

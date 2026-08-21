@@ -200,3 +200,93 @@ export async function cambiarEstado(
     ? { ok: false, mensaje: ERROR_SIN_CONFIRMACION }
     : { ok: true, sugerencia };
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+ *  ÍTEM #16 — LA AGRUPACIÓN
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/** ADR 0003's route for grouping. */
+export const RUTA_GRUPOS = "/api/sugerencias/grupos";
+
+/** `DELETE /api/sugerencias/{id}/grupo` — the way out of a group. */
+export function rutaGrupoDeSugerencia(id: number): string {
+  return `/api/sugerencias/${id}/grupo`;
+}
+
+/** The grouping change never reached the server: no status, no body, nothing written. */
+export const ERROR_DE_RED_GRUPO =
+  "No pudimos conectar con el servidor, así que la agrupación no cambió. Revisa tu conexión y " +
+  "vuelve a intentarlo.";
+
+/**
+ * A 2xx that did not carry the updated list.
+ *
+ * Its own sentence for the same reason `ERROR_SIN_CONFIRMACION` has one, and the
+ * doubt is wider here: a grouping write can dissolve a group and free a
+ * suggestion nobody named, so "nothing changed" is precisely what cannot be
+ * promised when the body is missing.
+ */
+export const ERROR_SIN_LISTA =
+  "El servidor respondió sin confirmar la agrupación. Actualiza la lista para ver cómo quedaron " +
+  "las sugerencias.";
+
+/** Confirms the grouping — DESIGN.md names "agrupar" among the actions a toast confirms. */
+export function confirmacionDeGrupo(cantidad: number): string {
+  return `Agrupamos ${cantidad} sugerencias.`;
+}
+
+/** Confirms the way out. */
+export const CONFIRMACION_QUITAR = "La sugerencia salió del grupo.";
+
+/**
+ * What a grouping action gives back: the WHOLE list, or a sentence to show.
+ *
+ * The list and not the affected row, because a grouping write reaches rows the
+ * caller never named — see `crearGrupoSugerencias`. This is also why the screen
+ * replaces its cache wholesale instead of patching an entry: there is no entry
+ * to patch that would be enough.
+ */
+export type ResultadoGrupo =
+  | { readonly ok: true; readonly sugerencias: readonly SugerenciaAdminDTO[] }
+  | { readonly ok: false; readonly mensaje: string };
+
+async function pedirLista(ruta: string, init: RequestInit): Promise<ResultadoGrupo> {
+  let response: Response;
+
+  try {
+    response = await fetch(ruta, init);
+  } catch {
+    /* No status, no body: the server was never reached, so nothing was written. */
+    return { ok: false, mensaje: ERROR_DE_RED_GRUPO };
+  }
+
+  const cuerpo = await response.json().catch(() => undefined);
+
+  if (!response.ok) {
+    return { ok: false, mensaje: mensajeDe(cuerpo) };
+  }
+
+  const sugerencias = sugerenciasDe(cuerpo);
+
+  return sugerencias === null ? { ok: false, mensaje: ERROR_SIN_LISTA } : { ok: true, sugerencias };
+}
+
+/** Alta de grupo — `POST /api/sugerencias/grupos`. */
+export function agruparSugerencias(
+  titulo: string,
+  sugerenciaIds: readonly number[],
+): Promise<ResultadoGrupo> {
+  return pedirLista(RUTA_GRUPOS, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ titulo, sugerenciaIds }),
+  });
+}
+
+/** Salida del grupo — `DELETE /api/sugerencias/{id}/grupo`. */
+export function quitarDeGrupo(id: number): Promise<ResultadoGrupo> {
+  return pedirLista(rutaGrupoDeSugerencia(id), {
+    method: "DELETE",
+    headers: { Accept: "application/json" },
+  });
+}

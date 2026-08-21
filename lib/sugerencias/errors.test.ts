@@ -1,12 +1,16 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { crearSugerenciaSchema } from "./schema";
+import { crearGrupoSchema, crearSugerenciaSchema, MINIMO_POR_GRUPO, TITULO_GRUPO_MAX } from "./schema";
 import {
+  AgrupacionRechazada,
   autorNoEncontrado,
   ERROR_INTERNO,
+  ERROR_INTERNO_AGRUPACION,
   ERROR_INTERNO_LISTADO,
   ERROR_INTERNO_REVISION,
+  errorDeAgrupacion,
+  errorDeGrupo,
   errorDePrisma,
   errorDeTransicion,
   errorDeValidacion,
@@ -297,5 +301,151 @@ describe("TransicionRechazada", () => {
     expect(rechazo).toBeInstanceOf(Error);
     expect(rechazo.motivo).toBe("conflicto");
     expect(rechazo.name).toBe("TransicionRechazada");
+  });
+});
+
+/**
+ * Las fallas de la agrupación — ítem #16.
+ *
+ * The register is the reviewer's, like the transition's above, but with one rule
+ * of its own: nothing here may say anything about a STATE, because grouping does
+ * not touch one.
+ */
+describe("errorDeAgrupacion", () => {
+  const VALIDO = { titulo: "Tableros de peajes", sugerenciaIds: [7, 12] };
+
+  /** Los rechazos los produce el schema REAL, no ZodErrors armados a mano. */
+  function rechazo(cuerpo: unknown) {
+    const resultado = crearGrupoSchema.safeParse(cuerpo);
+
+    if (resultado.success) throw new Error("El schema aceptó un cuerpo que la prueba creía inválido");
+
+    return errorDeAgrupacion(resultado.error);
+  }
+
+  it("señala el título con su propio código", () => {
+    const fallo = rechazo({ ...VALIDO, titulo: "" });
+
+    expect(fallo.status).toBe(400);
+    expect(fallo.error.codigo).toBe("titulo_de_grupo_invalido");
+    expect(fallo.error.mensaje).toContain(String(TITULO_GRUPO_MAX));
+  });
+
+  it("señala la selección con su propio código", () => {
+    const fallo = rechazo({ ...VALIDO, sugerenciaIds: [7] });
+
+    expect(fallo.status).toBe(400);
+    expect(fallo.error.codigo).toBe("seleccion_invalida");
+    expect(fallo.error.mensaje).toContain(String(MINIMO_POR_GRUPO));
+  });
+
+  /** Elegir dos veces la misma ES no elegir dos: una sola frase alcanza. */
+  it("contesta el duplicado con la misma frase de la selección", () => {
+    expect(rechazo({ ...VALIDO, sugerenciaIds: [7, 7] }).error.codigo).toBe("seleccion_invalida");
+  });
+
+  it("contesta un cuerpo ilegible sin culpar a un campo", () => {
+    expect(rechazo(undefined).error.codigo).toBe("datos_invalidos");
+  });
+
+  it("no reenvía nada que haya dicho zod", () => {
+    for (const cuerpo of [{ ...VALIDO, titulo: "" }, { ...VALIDO, sugerenciaIds: [] }, "no"]) {
+      expect(rechazo(cuerpo).error.mensaje).not.toMatch(/zod|expected|received|array|string/i);
+    }
+  });
+});
+
+describe("errorDeGrupo", () => {
+  it("responde 409 cuando alguna de las elegidas ya no existe", () => {
+    const fallo = errorDeGrupo(new AgrupacionRechazada("sugerencias_no_encontradas"));
+
+    expect(fallo.status).toBe(409);
+    expect(fallo.error.codigo).toBe("sugerencias_no_encontradas");
+  });
+
+  it("responde 404 cuando la sugerencia ya no existe", () => {
+    expect(errorDeGrupo(new AgrupacionRechazada("sugerencia_no_encontrada")).status).toBe(404);
+  });
+
+  it("responde 404 cuando el grupo ya no existe", () => {
+    const fallo = errorDeGrupo(new AgrupacionRechazada("grupo_no_encontrado"));
+
+    expect(fallo.status).toBe(404);
+    expect(fallo.error.codigo).toBe("grupo_no_encontrado");
+  });
+
+  /** Ya estaba suelta: la pantalla discrepa con la base y hay que decirlo. */
+  it("responde 409 cuando la sugerencia ya no estaba en ningún grupo", () => {
+    const fallo = errorDeGrupo(new AgrupacionRechazada("sin_grupo"));
+
+    expect(fallo.status).toBe(409);
+    expect(fallo.error.codigo).toBe("sugerencia_sin_grupo");
+  });
+
+  it("manda a actualizar la lista en los cuatro casos", () => {
+    for (const motivo of [
+      "sugerencias_no_encontradas",
+      "sugerencia_no_encontrada",
+      "grupo_no_encontrado",
+      "sin_grupo",
+    ] as const) {
+      expect(errorDeGrupo(new AgrupacionRechazada(motivo)).error.mensaje).toMatch(/actualiza/i);
+    }
+  });
+
+  it.each([new Error("deadlock"), { code: "P2003" }, undefined, null, "boom"])(
+    "responde el error interno de agrupación ante %o",
+    (error) => {
+      expect(errorDeGrupo(error)).toBe(ERROR_INTERNO_AGRUPACION);
+    },
+  );
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   *  UN RECHAZO DE TRANSICIÓN NO PUEDE CONTESTAR EN UNA RUTA DE GRUPO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Son dos clases separadas justamente para esto. Si `motivo` fuera una sola
+   * unión compartida, un rechazo del embudo llegaría a la ruta de agrupación y el
+   * compilador no tendría nada que decir — y el lector recibiría una frase sobre
+   * un estado que nadie tocó.
+   */
+  it("no contesta un TransicionRechazada como si fuera suyo", () => {
+    expect(errorDeGrupo(new TransicionRechazada("conflicto"))).toBe(ERROR_INTERNO_AGRUPACION);
+    expect(errorDeTransicion(new AgrupacionRechazada("sin_grupo"))).toBe(ERROR_INTERNO_REVISION);
+  });
+
+  /** Agrupar no toca el estado, así que ninguna frase de acá puede hablar de uno. */
+  it("ninguna frase de agrupación habla del estado de una sugerencia", () => {
+    const frases = [
+      ERROR_INTERNO_AGRUPACION.error.mensaje,
+      ...(["sugerencias_no_encontradas", "sugerencia_no_encontrada", "grupo_no_encontrado", "sin_grupo"] as const).map(
+        (motivo) => errorDeGrupo(new AgrupacionRechazada(motivo)).error.mensaje,
+      ),
+    ];
+
+    for (const frase of frases) {
+      expect(frase).not.toMatch(/pendiente|revisión|aprobada|rechazada|implementada/i);
+    }
+  });
+
+  it("promete que la agrupación no cambió, y no que el estado quedó como estaba", () => {
+    expect(ERROR_INTERNO_AGRUPACION.status).toBe(500);
+    expect(ERROR_INTERNO_AGRUPACION.error.mensaje).toMatch(/agrupación/i);
+    expect(ERROR_INTERNO_AGRUPACION.error.mensaje).not.toBe(ERROR_INTERNO_REVISION.error.mensaje);
+  });
+});
+
+describe("AgrupacionRechazada", () => {
+  it("es un Error, que es lo que revierte la transacción", () => {
+    const rechazo = new AgrupacionRechazada("sin_grupo");
+
+    expect(rechazo).toBeInstanceOf(Error);
+    expect(rechazo.motivo).toBe("sin_grupo");
+    expect(rechazo.name).toBe("AgrupacionRechazada");
+  });
+
+  it("no es un TransicionRechazada", () => {
+    expect(new AgrupacionRechazada("sin_grupo")).not.toBeInstanceOf(TransicionRechazada);
   });
 });

@@ -157,3 +157,65 @@ export const cambiarEstadoSchema = z.object({
 });
 
 export type CambiarEstado = z.infer<typeof cambiarEstadoSchema>;
+
+/* ══════════════════════════════════════════════════════════════════════════
+ *  ÍTEM #16 — LA AGRUPACIÓN
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/** `grupo_sugerencia.titulo NVARCHAR(200)`, the same width as a suggestion's. */
+export const TITULO_GRUPO_MAX = 200;
+
+/**
+ * The most suggestions one request may file into a group.
+ *
+ * Not a rule of the domain — the column cannot express it and the database does
+ * not care. It is a bound on a request: without it the endpoint accepts an array
+ * of any length and turns it into an `UPDATE ... WHERE id IN (...)` of any
+ * length, which is a request anyone can make expensive.
+ *
+ * A hundred is far past what this feature is for. A group is a bucket a person
+ * reads — "these six are all about the same toll booth" — and the moment it is
+ * in the hundreds, nobody is reading it as a group any more.
+ */
+export const SUGERENCIAS_POR_GRUPO_MAX = 100;
+
+/**
+ * The smallest group that is a group.
+ *
+ * TECH-DESIGN.md asks for "2+ sugerencias similares", and the number is load
+ * bearing rather than decorative: a group of one is a suggestion with a label on
+ * it, and rendering it as a group would show a bucket header over a single card.
+ * The repository keeps this true AFTER writes as well — see
+ * `disolverGruposSinMinimo`.
+ */
+export const MINIMO_POR_GRUPO = 2;
+
+const idSugerencia = z.number().int().positive().max(ID_MAX);
+
+/**
+ * The body of `POST /api/sugerencias/grupos` — ADR 0003's route for grouping.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  THE DUPLICATE CHECK IS NOT PEDANTRY
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * `[7, 7]` has two entries and one suggestion. Without the check it passes the
+ * minimum, and the repository then compares "how many rows did I find" against
+ * "how many ids did I get" and refuses for a reason that is a lie — it would
+ * report that a suggestion is missing when all of them are there. Refusing the
+ * duplicate here means the answer names the actual problem.
+ *
+ * `creadoPor` is deliberately absent: who created the group comes from the
+ * session, never from the body — the same rule `cambiarEstadoSchema` states for
+ * the asiento's author.
+ */
+export const crearGrupoSchema = z.object({
+  titulo: z.string().trim().min(1).max(TITULO_GRUPO_MAX),
+  sugerenciaIds: z
+    .array(idSugerencia)
+    .min(MINIMO_POR_GRUPO)
+    .max(SUGERENCIAS_POR_GRUPO_MAX)
+    .refine((ids) => new Set(ids).size === ids.length),
+});
+
+export type CrearGrupo = z.infer<typeof crearGrupoSchema>;

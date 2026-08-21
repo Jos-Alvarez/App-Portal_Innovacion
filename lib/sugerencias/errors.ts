@@ -2,7 +2,14 @@ import type { ZodError, ZodIssue } from "zod";
 
 import { type ApiFailure, apiFailure } from "@/lib/api/errors";
 
-import { AREA_DESTINO_MAX, DESCRIPCION_MAX, TITULO_MAX } from "@/lib/sugerencias/schema";
+import {
+  AREA_DESTINO_MAX,
+  DESCRIPCION_MAX,
+  MINIMO_POR_GRUPO,
+  SUGERENCIAS_POR_GRUPO_MAX,
+  TITULO_GRUPO_MAX,
+  TITULO_MAX,
+} from "@/lib/sugerencias/schema";
 
 /**
  * Every way a request about a `sugerencia` can fail, expressed as the one
@@ -291,4 +298,139 @@ export function estadoInvalido(): ApiFailure {
     "estado_invalido",
     "Ese no es un estado válido para una sugerencia. Elige uno de la lista y vuelve a intentarlo.",
   );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+ *  ÍTEM #16 — LA AGRUPACIÓN
+ *
+ * Read by the same administrator as the review above, so the copy keeps that
+ * register — but it must never say "quedó como estaba" about a state, because
+ * grouping does not touch one. Filing an idea into a bucket is not a transition.
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/** Why a grouping change could not be applied. */
+export type MotivoAgrupacion =
+  | "sugerencias_no_encontradas"
+  | "sugerencia_no_encontrada"
+  | "grupo_no_encontrado"
+  | "sin_grupo";
+
+/**
+ * A refused grouping change, thrown by the repository and mapped by the route.
+ *
+ * An exception for the same reason `TransicionRechazada` is one: these cases are
+ * decided INSIDE an interactive transaction, and throwing is what rolls it back.
+ * A grouping write touches more rows than the caller named — moving a suggestion
+ * out of its old group can dissolve that group and null another suggestion's
+ * `grupo_id` — so a half-applied refusal is worse here than anywhere else in the
+ * portal.
+ *
+ * It is a SEPARATE class from `TransicionRechazada` rather than a widened
+ * `motivo`, because the two describe different things and are answered with
+ * different sentences. A union of both vocabularies would let a state-machine
+ * refusal reach a grouping route, and the compiler would have nothing to say
+ * about it.
+ */
+export class AgrupacionRechazada extends Error {
+  constructor(readonly motivo: MotivoAgrupacion) {
+    super(`Agrupación rechazada: ${motivo}`);
+    this.name = "AgrupacionRechazada";
+  }
+}
+
+/**
+ * The failing end of the two grouping routes, one sentence per reason.
+ *
+ * All four are 404/409 rather than 400: the request was well formed and the
+ * state of the world changed underneath it. Every message ends by pointing at
+ * the list, because in each case the screen is showing something that is no
+ * longer true and a refresh is the actual fix.
+ */
+const MENSAJES_AGRUPACION: Record<MotivoAgrupacion, ApiFailure> = {
+  sugerencias_no_encontradas: apiFailure(
+    409,
+    "sugerencias_no_encontradas",
+    "Alguna de las sugerencias que elegiste ya no existe, así que no armamos el grupo. Actualiza la lista y vuelve a elegir.",
+  ),
+  sugerencia_no_encontrada: apiFailure(
+    404,
+    "sugerencia_no_encontrada",
+    "Esa sugerencia ya no existe. Actualiza la lista para ver las que siguen vigentes.",
+  ),
+  grupo_no_encontrado: apiFailure(
+    404,
+    "grupo_no_encontrado",
+    "Ese grupo ya no existe. Actualiza la lista para ver cómo quedaron agrupadas las sugerencias.",
+  ),
+  sin_grupo: apiFailure(
+    409,
+    "sugerencia_sin_grupo",
+    "Esa sugerencia ya no está en ningún grupo. Actualiza la lista para verla donde quedó.",
+  ),
+};
+
+/**
+ * The one answer to everything unrecognised while grouping.
+ *
+ * A third internal error, and the third promise: `ERROR_INTERNO` says the
+ * suggestion was not saved, `ERROR_INTERNO_REVISION` says the state stayed as it
+ * was, and this one says the grouping did not change. They are different facts
+ * about different writes, and a shared sentence would be wrong on two of the
+ * three screens that show it.
+ */
+export const ERROR_INTERNO_AGRUPACION: ApiFailure = apiFailure(
+  500,
+  "error_interno",
+  "No pudimos cambiar la agrupación. Las sugerencias quedaron como estaban; vuelve a intentarlo en un momento.",
+);
+
+/**
+ * A rejected body on `POST /api/sugerencias/grupos`.
+ *
+ * Keyed on the field, like the collaborator's mapping and unlike
+ * `estadoInvalido`: this body has two fields that fail for genuinely different
+ * reasons, and "escribe un nombre" and "elige al menos dos" are not one sentence.
+ *
+ * The count in the selection's message is interpolated from `MINIMO_POR_GRUPO`,
+ * so the copy and the rule cannot drift apart — and the same sentence covers the
+ * duplicate, because picking the same suggestion twice IS failing to pick two.
+ */
+export function errorDeAgrupacion(error: ZodError): ApiFailure {
+  const campo = campoDe(error.issues[0]);
+
+  if (campo === "titulo") {
+    return apiFailure(
+      400,
+      "titulo_de_grupo_invalido",
+      `Ponle un nombre al grupo, de hasta ${TITULO_GRUPO_MAX} caracteres.`,
+    );
+  }
+
+  if (campo === "sugerenciaIds") {
+    return apiFailure(
+      400,
+      "seleccion_invalida",
+      `Elige al menos ${MINIMO_POR_GRUPO} sugerencias distintas para agrupar, y no más de ${SUGERENCIAS_POR_GRUPO_MAX}.`,
+    );
+  }
+
+  return apiFailure(
+    400,
+    "datos_invalidos",
+    "No pudimos leer el grupo que querías armar. Actualiza la lista e inténtalo de nuevo.",
+  );
+}
+
+/**
+ * A failed grouping write, as the administrator sees it.
+ *
+ * The typed refusals get their own sentence; anything else is the internal
+ * error. There is deliberately no P2003 branch on `creado_por`: an administrator
+ * whose own row vanished mid-request is a session problem, and the guard
+ * re-reads that row on the next request anyway.
+ */
+export function errorDeGrupo(error: unknown): ApiFailure {
+  return error instanceof AgrupacionRechazada
+    ? MENSAJES_AGRUPACION[error.motivo]
+    : ERROR_INTERNO_AGRUPACION;
 }

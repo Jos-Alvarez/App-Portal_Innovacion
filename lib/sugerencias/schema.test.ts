@@ -4,11 +4,15 @@ import { describe, expect, it } from "vitest";
 import {
   AREA_DESTINO_MAX,
   cambiarEstadoSchema,
+  crearGrupoSchema,
   crearSugerenciaSchema,
   DESCRIPCION_MAX,
   ESTADO_INICIAL,
   ESTADOS_SUGERENCIA,
   idSugerenciaSchema,
+  MINIMO_POR_GRUPO,
+  SUGERENCIAS_POR_GRUPO_MAX,
+  TITULO_GRUPO_MAX,
   TITULO_MAX,
 } from "./schema";
 
@@ -279,5 +283,106 @@ describe("cambiarEstadoSchema", () => {
   /** El embudo no se valida acá: el repositorio explica por qué no se valida en ningún lado. */
   it("acepta una transición hacia atrás, porque el orden del embudo no es una regla", () => {
     expect(cambiarEstadoSchema.safeParse({ estado: "pendiente" }).success).toBe(true);
+  });
+});
+
+/**
+ * El cuerpo del alta de grupo.
+ *
+ * `crearGrupoSchema` is where the minimum lives at CREATION time; the repository
+ * is where it survives later writes. These tests pin the first half.
+ */
+describe("crearGrupoSchema", () => {
+  const VALIDO = { titulo: "Tableros de peajes", sugerenciaIds: [7, 12] };
+
+  it("acepta un título y dos sugerencias", () => {
+    const resultado = crearGrupoSchema.safeParse(VALIDO);
+
+    expect(resultado.success).toBe(true);
+    expect(resultado.data).toEqual(VALIDO);
+  });
+
+  it("recorta el título, como toda entrada de texto acá", () => {
+    const resultado = crearGrupoSchema.safeParse({ ...VALIDO, titulo: "  Peajes  " });
+
+    expect(resultado.data?.titulo).toBe("Peajes");
+  });
+
+  it.each(["", "   ", "\n"])("rechaza el título %o", (titulo) => {
+    const resultado = crearGrupoSchema.safeParse({ ...VALIDO, titulo });
+
+    expect(resultado.success).toBe(false);
+    expect(resultado.error?.issues[0]?.path).toEqual(["titulo"]);
+  });
+
+  it("acepta el título en su ancho máximo y rechaza el siguiente carácter", () => {
+    expect(
+      crearGrupoSchema.safeParse({ ...VALIDO, titulo: "a".repeat(TITULO_GRUPO_MAX) }).success,
+    ).toBe(true);
+    expect(
+      crearGrupoSchema.safeParse({ ...VALIDO, titulo: "a".repeat(TITULO_GRUPO_MAX + 1) }).success,
+    ).toBe(false);
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   *  UN GRUPO DE UNO NO ES UN GRUPO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * TECH-DESIGN.md pide "2+ sugerencias similares", y el número carga peso: un
+   * grupo de uno es una sugerencia con una etiqueta, y dibujarlo sería un
+   * encabezado de balde sobre una sola tarjeta.
+   */
+  it.each([[[]], [[7]]])("rechaza una selección de menos de dos: %o", (sugerenciaIds) => {
+    const resultado = crearGrupoSchema.safeParse({ ...VALIDO, sugerenciaIds });
+
+    expect(resultado.success).toBe(false);
+    expect(resultado.error?.issues[0]?.path).toEqual(["sugerenciaIds"]);
+  });
+
+  it("el mínimo del schema es el mismo que lee el repositorio", () => {
+    expect(MINIMO_POR_GRUPO).toBe(2);
+    expect(
+      crearGrupoSchema.safeParse({ ...VALIDO, sugerenciaIds: Array.from({ length: MINIMO_POR_GRUPO }, (_, i) => i + 1) })
+        .success,
+    ).toBe(true);
+  });
+
+  /**
+   * `[7, 7]` tiene dos entradas y una sugerencia. Sin este chequeo pasa el mínimo,
+   * y el repositorio después compara "cuántas filas encontré" contra "cuántos ids
+   * me dieron" y rechaza por un motivo que es mentira: reportaría que falta una
+   * sugerencia cuando están todas.
+   */
+  it("rechaza la misma sugerencia elegida dos veces", () => {
+    const resultado = crearGrupoSchema.safeParse({ ...VALIDO, sugerenciaIds: [7, 7] });
+
+    expect(resultado.success).toBe(false);
+    expect(resultado.error?.issues[0]?.path).toEqual(["sugerenciaIds"]);
+  });
+
+  it("rechaza más sugerencias que el tope de una request", () => {
+    const demasiadas = Array.from({ length: SUGERENCIAS_POR_GRUPO_MAX + 1 }, (_, i) => i + 1);
+
+    expect(crearGrupoSchema.safeParse({ ...VALIDO, sugerenciaIds: demasiadas }).success).toBe(false);
+  });
+
+  it.each([[["7", "12"]], [[7.5, 12]], [[-1, 12]], [[0, 12]], [[null, 12]]])(
+    "rechaza los ids %o",
+    (sugerenciaIds) => {
+      expect(crearGrupoSchema.safeParse({ ...VALIDO, sugerenciaIds }).success).toBe(false);
+    },
+  );
+
+  it.each([undefined, null, 42, [], "grupo"])("rechaza el cuerpo %o", (cuerpo) => {
+    expect(crearGrupoSchema.safeParse(cuerpo).success).toBe(false);
+  });
+
+  /** Quién creó el grupo sale de la sesión, nunca del cuerpo. */
+  it("descarta creadoPor y cualquier otra clave", () => {
+    const resultado = crearGrupoSchema.safeParse({ ...VALIDO, creadoPor: 99, id: 4 });
+
+    expect(resultado.success).toBe(true);
+    expect(resultado.data).toEqual(VALIDO);
   });
 });

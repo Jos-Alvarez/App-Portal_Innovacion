@@ -8,15 +8,23 @@ import type { SugerenciaAdminDTO } from "@/lib/sugerencias/repository";
 
 const obtenerTodas = vi.fn();
 const cambiarEstado = vi.fn();
+const agruparSugerencias = vi.fn();
+const quitarDeGrupo = vi.fn();
 
 vi.mock("./sugerencias-client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./sugerencias-client")>()),
   obtenerTodas: (ruta: string) => obtenerTodas(ruta),
   cambiarEstado: (id: number, estado: string) => cambiarEstado(id, estado),
+  agruparSugerencias: (titulo: string, ids: readonly number[]) => agruparSugerencias(titulo, ids),
+  quitarDeGrupo: (id: number) => quitarDeGrupo(id),
 }));
 
 import { SugerenciasAdmin } from "./sugerencias-admin";
-import { AVISO_SIN_ACTUALIZAR } from "./sugerencias-client";
+import {
+  AVISO_SIN_ACTUALIZAR,
+  CONFIRMACION_QUITAR,
+  confirmacionDeGrupo,
+} from "./sugerencias-client";
 
 /**
  * La pantalla de gestión: el ítem #15 del lado del Área de Innovación.
@@ -36,6 +44,7 @@ const PENDIENTE: SugerenciaAdminDTO = {
   estado: "pendiente",
   fechaCreacion: "2026-08-21T14:30:00.000Z",
   autor: { nombre: "Ana Quispe", area: "Peajes" },
+  grupo: null,
   historial: [
     {
       id: 90,
@@ -55,6 +64,7 @@ const APROBADA: SugerenciaAdminDTO = {
   estado: "aprobada",
   fechaCreacion: "2026-07-02T13:00:00.000Z",
   autor: { nombre: "Luis Rojas", area: "Legal" },
+  grupo: null,
   historial: [
     {
       id: 20,
@@ -79,6 +89,58 @@ const APROBADA: SugerenciaAdminDTO = {
     },
   ],
 };
+
+/* ── Ítem #16: el grupo ───────────────────────────────────────────────────── */
+
+const GRUPO = { id: 5, titulo: "Ideas de peaje" };
+
+/**
+ * Dos miembros del mismo grupo EN ESTADOS DISTINTOS, y es a propósito: el ítem
+ * #16 promete que agrupar "conserva el estado individual de cada una", así que
+ * un par homogéneo no probaría nada sobre el filtro.
+ */
+const AGRUPADA_UNO: SugerenciaAdminDTO = {
+  id: 41,
+  titulo: "Peaje en vivo",
+  descripcion: "Ver el flujo de cada caseta al minuto.",
+  areaDestino: "Operaciones",
+  estado: "pendiente",
+  fechaCreacion: "2026-08-20T11:00:00.000Z",
+  autor: { nombre: "Ana Quispe", area: "Peajes" },
+  grupo: GRUPO,
+  historial: [
+    {
+      id: 70,
+      estadoAnterior: null,
+      estadoNuevo: "pendiente",
+      fechaCambio: "2026-08-20T11:00:00.000Z",
+      autor: "Ana Quispe",
+    },
+  ],
+};
+
+const AGRUPADA_DOS: SugerenciaAdminDTO = {
+  id: 42,
+  titulo: "Peaje por caseta",
+  descripcion: "Comparar casetas entre sí.",
+  areaDestino: "Operaciones",
+  estado: "aprobada",
+  fechaCreacion: "2026-08-19T09:00:00.000Z",
+  autor: { nombre: "Luis Rojas", area: "Peajes" },
+  grupo: GRUPO,
+  historial: [
+    {
+      id: 71,
+      estadoAnterior: null,
+      estadoNuevo: "pendiente",
+      fechaCambio: "2026-08-19T09:00:00.000Z",
+      autor: "Luis Rojas",
+    },
+  ],
+};
+
+/** Lo que devuelve el servidor cuando la #41 sale del grupo. */
+const SUELTA_DE_NUEVO: SugerenciaAdminDTO = { ...AGRUPADA_UNO, grupo: null };
 
 /**
  * A fresh SWR cache per test. Without it the module-level cache would carry one
@@ -124,12 +186,45 @@ function chip(titulo: string): HTMLElement {
   return tarjeta(titulo).querySelector("[data-tone]") as HTMLElement;
 }
 
+/** El nombre accesible de la barra de agrupación, que es su `aria-label`. */
+const BARRA = "Agrupar las sugerencias seleccionadas";
+
+/**
+ * El bloque de un grupo.
+ *
+ * Se busca por `role="region"`, que es lo que un <section> CON NOMBRE ACCESIBLE
+ * expone — y ese nombre es justamente lo que el ítem #16 pide que se vea. Si
+ * alguien cambiara la <section> por un <div> con un borde, este helper dejaría de
+ * encontrarla, que es exactamente el aviso que queremos.
+ */
+function grupo(titulo: string): HTMLElement {
+  return screen.getByRole("region", { name: titulo });
+}
+
+/** El checkbox de una tarjeta, por el nombre que sólo lee la tecnología asistiva. */
+function seleccionar(titulo: string): HTMLElement {
+  return screen.getByRole("checkbox", { name: `Seleccionar «${titulo}»` });
+}
+
+/** El botón que saca a una sugerencia de su grupo. */
+function salida(titulo: string): HTMLElement {
+  return screen.getByRole("button", { name: `Quitar «${titulo}» del grupo` });
+}
+
 beforeEach(() => {
   /* Never resolving by default: a test that cares about revalidation says so. */
   obtenerTodas.mockReset().mockReturnValue(new Promise(() => {}));
   cambiarEstado.mockReset().mockResolvedValue({
     ok: true,
     sugerencia: { ...PENDIENTE, estado: "en_revision" },
+  });
+  agruparSugerencias.mockReset().mockResolvedValue({
+    ok: true,
+    sugerencias: [AGRUPADA_UNO, AGRUPADA_DOS],
+  });
+  quitarDeGrupo.mockReset().mockResolvedValue({
+    ok: true,
+    sugerencias: [SUELTA_DE_NUEVO, { ...AGRUPADA_DOS, grupo: null }],
   });
 });
 
@@ -298,7 +393,19 @@ describe("los botones del embudo", () => {
     expect(titulos).toEqual(["Tablero de peajes", "Firma digital de actas"]);
   });
 
-  it("apaga los botones de esa tarjeta mientras el cambio está en vuelo", async () => {
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   *  UNA ESCRITURA EN VUELO APAGA TODA LA LISTA, NO SÓLO SU TARJETA
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * El ítem #16 cambió esto a propósito. `revisar` y `aplicarGrupo` arrancan las
+   * dos con un `if (ocupado !== null) return`, así que un clic en otra tarjeta ya
+   * no hacía nada — y un botón habilitado que no hace nada miente. Con la
+   * agrupación en la mezcla el argumento se endurece: mientras una escritura de
+   * grupo está en vuelo la lista entera está por ser reemplazada, y ofrecer una
+   * acción contra las filas que están a punto de cambiar es ofrecer una carrera.
+   */
+  it("apaga toda la lista mientras hay una escritura en vuelo", async () => {
     const usuario = userEvent.setup();
     cambiarEstado.mockReturnValue(new Promise(() => {}));
     render(montar([PENDIENTE, APROBADA]));
@@ -306,8 +413,7 @@ describe("los botones del embudo", () => {
     await usuario.click(boton("Tablero de peajes", "Aprobada"));
 
     expect(boton("Tablero de peajes", "Aprobada")).toBeDisabled();
-    /* La otra tarjeta sigue viva: se apaga la acción, no la pantalla. */
-    expect(boton("Firma digital de actas", "Rechazada")).toBeEnabled();
+    expect(boton("Firma digital de actas", "Rechazada")).toBeDisabled();
   });
 });
 
@@ -450,5 +556,277 @@ describe("las dos fallas, tratadas distinto", () => {
     await usuario.click(boton("Tablero de peajes", "En revisión"));
 
     await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+ *  ÍTEM #16 — LA AGRUPACIÓN, DEL LADO DE LA PANTALLA
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * QUÉ NO SE REPRUEBA ACÁ. `agrupacion.test.ts` es dueño de CÓMO una lista plana
+ * se vuelve bloques — el orden, el conteo, la honestidad del filtro — y lo hace
+ * sin montar nada. `sugerencias-client.test.ts` es dueño del POST, del DELETE y
+ * de sus fallas. Las rutas son dueñas del guard y de los códigos. Lo que queda,
+ * y es lo único que se prueba en este archivo, es lo que la PANTALLA hace: qué
+ * dibuja, qué ofrece, qué manda y qué hace con la respuesta.
+ */
+
+describe("el bloque de un grupo", () => {
+  it("dibuja el grupo como una región con el nombre que le pusieron", () => {
+    render(montar([AGRUPADA_UNO, AGRUPADA_DOS]));
+
+    expect(grupo("Ideas de peaje")).toBeInTheDocument();
+  });
+
+  it("muestra juntos a los miembros, dentro del bloque", () => {
+    render(montar([PENDIENTE, AGRUPADA_UNO, AGRUPADA_DOS]));
+
+    const bloque = grupo("Ideas de peaje");
+
+    expect(within(bloque).getByRole("heading", { name: "Peaje en vivo" })).toBeInTheDocument();
+    expect(within(bloque).getByRole("heading", { name: "Peaje por caseta" })).toBeInTheDocument();
+    /* La suelta queda afuera del bloque, no adentro. */
+    expect(within(bloque).queryByRole("heading", { name: "Tablero de peajes" })).toBeNull();
+  });
+
+  it("dice cuántas sugerencias tiene el grupo", () => {
+    render(montar([AGRUPADA_UNO, AGRUPADA_DOS]));
+
+    expect(within(grupo("Ideas de peaje")).getByText("2 sugerencias")).toBeInTheDocument();
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   *  AGRUPAR NO UNIFICA ESTADOS
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * El ítem #16 dice que cada sugerencia conserva su estado y su autor. Dos
+   * miembros del mismo grupo con dos chips distintos es la prueba de que el
+   * bloque es una forma de MOSTRARLAS, no de fusionarlas.
+   */
+  it("conserva el estado y el autor individuales de cada miembro", () => {
+    render(montar([AGRUPADA_UNO, AGRUPADA_DOS]));
+
+    expect(chip("Peaje en vivo")).toHaveTextContent("Pendiente");
+    expect(chip("Peaje por caseta")).toHaveTextContent("Aprobada");
+    expect(tarjeta("Peaje en vivo")).toHaveTextContent("Ana Quispe");
+    expect(tarjeta("Peaje por caseta")).toHaveTextContent("Luis Rojas");
+  });
+
+  /**
+   * "5 de 5" hace buscar la que falta; "1 de 2" es la única frase honesta cuando
+   * el filtro escondió a un miembro. Mostrar el grupo ENTERO porque uno matchea
+   * pondría una tarjeta pendiente bajo el filtro "Aprobada" — el filtro estaría
+   * mintiendo.
+   */
+  it("con un filtro puesto, dice cuántas está viendo y cuántas hay", async () => {
+    const usuario = userEvent.setup();
+    render(montar([AGRUPADA_UNO, AGRUPADA_DOS]));
+
+    await usuario.click(screen.getByRole("button", { name: "Aprobada (1)" }));
+
+    const bloque = grupo("Ideas de peaje");
+
+    expect(within(bloque).getByText("1 de 2 sugerencias")).toBeInTheDocument();
+    expect(within(bloque).queryByRole("heading", { name: "Peaje en vivo" })).toBeNull();
+  });
+});
+
+describe("armar un grupo", () => {
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   *  UNA SOLA NO ES UN GRUPO, Y LA BARRA ES QUIEN LO DICE
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * `crearGrupoSchema` rechaza menos de dos y el endpoint contestaría 400.
+   * Ofrecer un botón habilitado que el servidor va a rechazar seguro es una
+   * promesa que la pantalla no puede cumplir.
+   */
+  it("no ofrece la barra hasta que hay dos marcadas", async () => {
+    const usuario = userEvent.setup();
+    render(montar([PENDIENTE, APROBADA]));
+
+    expect(screen.queryByRole("form", { name: BARRA })).toBeNull();
+
+    await usuario.click(seleccionar("Tablero de peajes"));
+    expect(screen.queryByRole("form", { name: BARRA })).toBeNull();
+
+    await usuario.click(seleccionar("Firma digital de actas"));
+    expect(screen.getByRole("form", { name: BARRA })).toBeInTheDocument();
+  });
+
+  it("no deja agrupar sin ponerle nombre al grupo", async () => {
+    const usuario = userEvent.setup();
+    render(montar([PENDIENTE, APROBADA]));
+
+    await usuario.click(seleccionar("Tablero de peajes"));
+    await usuario.click(seleccionar("Firma digital de actas"));
+
+    const barra = screen.getByRole("form", { name: BARRA });
+
+    expect(within(barra).getByRole("button", { name: "Agrupar" })).toBeDisabled();
+  });
+
+  it("manda el nombre y los ids marcados", async () => {
+    const usuario = userEvent.setup();
+    render(montar([PENDIENTE, APROBADA]));
+
+    await usuario.click(seleccionar("Tablero de peajes"));
+    await usuario.click(seleccionar("Firma digital de actas"));
+    await usuario.type(screen.getByLabelText("Nombre del grupo"), "Ideas de peaje");
+    await usuario.click(
+      within(screen.getByRole("form", { name: BARRA })).getByRole("button", { name: "Agrupar" }),
+    );
+
+    await waitFor(() => expect(agruparSugerencias).toHaveBeenCalledWith("Ideas de peaje", [31, 12]));
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   *  LA RESPUESTA REEMPLAZA LA LISTA ENTERA, NO PARCHEA UNA FILA
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Agrupar puede dejar al grupo ANTERIOR de una sugerencia bajo el mínimo, y eso
+   * lo disuelve y libera a una fila que nadie nombró. Parchear la entrada que el
+   * cliente pidió dejaría en pantalla un grupo que ya no existe.
+   */
+  it("redibuja la lista con lo que devolvió el servidor", async () => {
+    const usuario = userEvent.setup();
+    render(montar([PENDIENTE, APROBADA]));
+
+    await usuario.click(seleccionar("Tablero de peajes"));
+    await usuario.click(seleccionar("Firma digital de actas"));
+    await usuario.type(screen.getByLabelText("Nombre del grupo"), "Ideas de peaje");
+    await usuario.click(
+      within(screen.getByRole("form", { name: BARRA })).getByRole("button", { name: "Agrupar" }),
+    );
+
+    expect(await screen.findByRole("region", { name: "Ideas de peaje" })).toBeInTheDocument();
+  });
+
+  it("confirma con un toast cuántas agrupó", async () => {
+    const usuario = userEvent.setup();
+    render(montar([PENDIENTE, APROBADA]));
+
+    await usuario.click(seleccionar("Tablero de peajes"));
+    await usuario.click(seleccionar("Firma digital de actas"));
+    await usuario.type(screen.getByLabelText("Nombre del grupo"), "Ideas de peaje");
+    await usuario.click(
+      within(screen.getByRole("form", { name: BARRA })).getByRole("button", { name: "Agrupar" }),
+    );
+
+    expect(await screen.findByText(confirmacionDeGrupo(2))).toBeInTheDocument();
+  });
+
+  /* Los tildes describían filas cuya agrupación ya cambió; dejarlos invita a una
+     segunda acción contra una lista que se movió. */
+  it("suelta la selección después de agrupar", async () => {
+    const usuario = userEvent.setup();
+    render(montar([PENDIENTE, APROBADA]));
+
+    await usuario.click(seleccionar("Tablero de peajes"));
+    await usuario.click(seleccionar("Firma digital de actas"));
+    await usuario.type(screen.getByLabelText("Nombre del grupo"), "Ideas de peaje");
+    await usuario.click(
+      within(screen.getByRole("form", { name: BARRA })).getByRole("button", { name: "Agrupar" }),
+    );
+
+    await screen.findByRole("region", { name: "Ideas de peaje" });
+    expect(screen.queryByRole("form", { name: BARRA })).toBeNull();
+  });
+
+  it("cancelar suelta la selección sin escribir nada", async () => {
+    const usuario = userEvent.setup();
+    render(montar([PENDIENTE, APROBADA]));
+
+    await usuario.click(seleccionar("Tablero de peajes"));
+    await usuario.click(seleccionar("Firma digital de actas"));
+    await usuario.click(
+      within(screen.getByRole("form", { name: BARRA })).getByRole("button", { name: "Cancelar" }),
+    );
+
+    expect(screen.queryByRole("form", { name: BARRA })).toBeNull();
+    expect(agruparSugerencias).not.toHaveBeenCalled();
+  });
+
+  it("muestra la frase del servidor cuando la agrupación no se aplicó", async () => {
+    const usuario = userEvent.setup();
+    agruparSugerencias.mockResolvedValue({
+      ok: false,
+      mensaje: "Una de las sugerencias ya no existe.",
+    });
+    render(montar([PENDIENTE, APROBADA]));
+
+    await usuario.click(seleccionar("Tablero de peajes"));
+    await usuario.click(seleccionar("Firma digital de actas"));
+    await usuario.type(screen.getByLabelText("Nombre del grupo"), "Ideas de peaje");
+    await usuario.click(
+      within(screen.getByRole("form", { name: BARRA })).getByRole("button", { name: "Agrupar" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/ya no existe/i);
+    expect(screen.queryByText(confirmacionDeGrupo(2))).toBeNull();
+  });
+});
+
+describe("salir de un grupo", () => {
+  /**
+   * El camino de corrección del ítem #16. Sin él, archivar una idea en el balde
+   * equivocado sólo se arregla contra la base de datos, y lo que el PRD describe
+   * como una comodidad se vuelve una decisión que nadie puede deshacer.
+   */
+  it("ofrece la salida sólo en las tarjetas que están en un grupo", () => {
+    render(montar([PENDIENTE, AGRUPADA_UNO, AGRUPADA_DOS]));
+
+    expect(salida("Peaje en vivo")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Quitar «Tablero de peajes» del grupo" }),
+    ).toBeNull();
+  });
+
+  it("manda el id de la sugerencia que sale", async () => {
+    const usuario = userEvent.setup();
+    render(montar([AGRUPADA_UNO, AGRUPADA_DOS]));
+
+    await usuario.click(salida("Peaje en vivo"));
+
+    await waitFor(() => expect(quitarDeGrupo).toHaveBeenCalledWith(41));
+  });
+
+  /**
+   * Sacar al anteúltimo miembro deja al grupo bajo el mínimo, así que se disuelve
+   * y el SOBREVIVIENTE también queda suelto — una fila que nadie nombró. Por eso
+   * la respuesta es la lista entera y acá desaparece el bloque completo.
+   */
+  it("redibuja la lista entera con lo que devolvió el servidor", async () => {
+    const usuario = userEvent.setup();
+    render(montar([AGRUPADA_UNO, AGRUPADA_DOS]));
+
+    await usuario.click(salida("Peaje en vivo"));
+
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Ideas de peaje" })).toBeNull());
+    /* Las dos sugerencias siguen ahí: salieron del grupo, no del portal. */
+    expect(screen.getByRole("heading", { name: "Peaje en vivo" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Peaje por caseta" })).toBeInTheDocument();
+  });
+
+  it("confirma la salida con un toast", async () => {
+    const usuario = userEvent.setup();
+    render(montar([AGRUPADA_UNO, AGRUPADA_DOS]));
+
+    await usuario.click(salida("Peaje en vivo"));
+
+    expect(await screen.findByText(CONFIRMACION_QUITAR)).toBeInTheDocument();
+  });
+
+  it("muestra la frase del servidor cuando la salida no se aplicó", async () => {
+    const usuario = userEvent.setup();
+    quitarDeGrupo.mockResolvedValue({ ok: false, mensaje: "Esa sugerencia no está en un grupo." });
+    render(montar([AGRUPADA_UNO, AGRUPADA_DOS]));
+
+    await usuario.click(salida("Peaje en vivo"));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/no está en un grupo/i);
+    expect(screen.queryByText(CONFIRMACION_QUITAR)).toBeNull();
   });
 });

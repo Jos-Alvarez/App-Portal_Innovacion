@@ -1,10 +1,11 @@
 import type { PrismaClient } from "@prisma/client";
 
-import { TransicionRechazada } from "@/lib/sugerencias/errors";
+import { AgrupacionRechazada, TransicionRechazada } from "@/lib/sugerencias/errors";
 import {
   type CrearSugerencia,
   ESTADO_INICIAL,
   type EstadoSugerencia,
+  MINIMO_POR_GRUPO,
 } from "@/lib/sugerencias/schema";
 
 /**
@@ -362,20 +363,38 @@ export type SugerenciasAdminClient = Pick<
  */
 export interface SugerenciaAdminDTO extends SugerenciaDTO {
   autor: { nombre: string; area: string };
+  /**
+   * The bucket the Área de Innovación filed this idea into, or `null` — item #16.
+   *
+   * The GROUP and not just its id, because the screen renders the title beside
+   * the cards and would otherwise need a second query to turn a number into the
+   * words somebody typed. It stays out of `SugerenciaDTO` for the reason item
+   * #13 gave: grouping is something the Área de Innovación does for its own
+   * convenience, the PRD is explicit that collaborators neither comment on nor
+   * vote on suggestions, and the author has no use for the bucket their idea was
+   * filed into.
+   */
+  grupo: { id: number; titulo: string } | null;
 }
 
-/** `SELECT_DTO` plus the author. */
+/** `SELECT_DTO` plus the author and the group. */
 const SELECT_ADMIN = {
   ...SELECT_DTO,
   autor: { select: { nombre: true, area: true } },
+  grupo: { select: { id: true, titulo: true } },
 } as const;
 
 interface FilaSugerenciaAdmin extends FilaSugerencia {
   autor: { nombre: string; area: string };
+  grupo: { id: number; titulo: string } | null;
 }
 
 function toAdminDTO(fila: FilaSugerenciaAdmin): SugerenciaAdminDTO {
-  return { ...toDTO(fila), autor: { nombre: fila.autor.nombre, area: fila.autor.area } };
+  return {
+    ...toDTO(fila),
+    autor: { nombre: fila.autor.nombre, area: fila.autor.area },
+    grupo: fila.grupo === null ? null : { id: fila.grupo.id, titulo: fila.grupo.titulo },
+  };
 }
 
 /**
@@ -534,5 +553,193 @@ export async function cambiarEstadoSugerencia(
     }
 
     return toAdminDTO(fila as FilaSugerenciaAdmin);
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+ *  ÍTEM #16 — LA AGRUPACIÓN
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  GROUPING NEVER TOUCHES `estado`, AND WRITES NO ASIENTO
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * TECH-DESIGN.md is explicit that grouped suggestions "conservan su estado y
+ * autor individuales", and ADR 0002 is equally explicit about what the ledger
+ * is: "un asiento por cada TRANSICIÓN" of state. Filing an idea into a bucket is
+ * not a transition — nothing about where the suggestion sits in the funnel
+ * changed, and the author reading their own trail would see a line reporting an
+ * event that never happened to their idea.
+ *
+ * So nothing below writes to `historial_sugerencia`, and nothing below writes
+ * `estado`. Two members of one group can sit in two different states, and that
+ * is not an inconsistency to reconcile: it is the PRD's "no gestionarlas por
+ * separado" meeting its own limit — the Área de Innovación reviews ideas one by
+ * one and reads them together.
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * The slice of Prisma the grouping writes use.
+ *
+ * `historialSugerencia` is deliberately NOT in it, and that is the note above
+ * expressed in the type system: this module physically cannot write an asiento
+ * while grouping, because it was never handed the delegate that would let it.
+ */
+export type GruposClient = Pick<PrismaClient, "sugerencia" | "grupoSugerencia" | "$transaction">;
+
+/**
+ * Deletes any of these groups that no longer has the minimum.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  A GROUP OF ONE IS NOT A GROUP, AND THE INVARIANT HOLDS AFTER WRITES TOO
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * `crearGrupoSchema` refuses a selection smaller than two, which keeps the
+ * invariant true at CREATION. It says nothing about what happens later — and
+ * later is where it breaks: pull one suggestion out of a pair and the survivor is
+ * alone in a bucket with a title, which is a suggestion with a label, rendered
+ * as a group header over a single card.
+ *
+ * Both writes below call this for every group they took a member away from.
+ *
+ * DELETING THE ROW IS WHAT FREES THE SURVIVOR. `sugerencia_grupo_id_fkey` is
+ * `ON DELETE SET NULL`, so removing the group nulls the remaining member's
+ * `grupo_id` in the same statement — there is no second UPDATE here, and no
+ * window in which a suggestion points at a group that is gone.
+ *
+ * `< MINIMO_POR_GRUPO` and not `=== 1`: zero is the other way this happens, when
+ * both members of a pair are pulled into a new group at once, and a group with
+ * no members at all is even less of a group than one with a single member.
+ */
+async function disolverGruposSinMinimo(
+  tx: Pick<PrismaClient, "sugerencia" | "grupoSugerencia">,
+  grupoIds: readonly number[],
+): Promise<void> {
+  for (const grupoId of grupoIds) {
+    const miembros = await tx.sugerencia.count({ where: { grupoId } });
+
+    if (miembros < MINIMO_POR_GRUPO) {
+      await tx.grupoSugerencia.delete({ where: { id: grupoId } });
+    }
+  }
+}
+
+/** The distinct groups these rows belong to, ignoring the ungrouped ones. */
+function gruposDe(filas: readonly { grupoId: number | null }[]): number[] {
+  return [...new Set(filas.map((fila) => fila.grupoId).filter((id): id is number => id !== null))];
+}
+
+/**
+ * Files two or more suggestions into a new group.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  IT ANSWERS WITH THE WHOLE LIST, AND THAT IS NOT LAZINESS
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * `cambiarEstadoSugerencia` answers with the one row it changed, because a state
+ * change affects exactly the row the caller named. A grouping change does not:
+ * moving a suggestion out of its old group can leave that group below the
+ * minimum, which deletes it, which nulls the `grupo_id` of a suggestion NOBODY
+ * NAMED — a row the caller has no way to know it needs to ask about.
+ *
+ * A response carrying only the named rows would therefore be true and
+ * insufficient, and the screen patching its cache from it would show a group
+ * that no longer exists until the next revalidation. Answering with the list
+ * removes the possibility rather than documenting it. It costs nothing new: the
+ * read is already unpaginated and the screen already holds all of it.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  THE COUNT CHECK IS THE ONE THAT MATTERS
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * `findMany` with `id: { in: ids }` silently returns fewer rows when one of the
+ * ids is gone — it is a filter, not a lookup. Without comparing the counts, a
+ * selection of two where one had just been deleted would create a group with a
+ * single member: the very state `disolverGruposSinMinimo` exists to prevent,
+ * arrived at through the front door. Refusing is right rather than
+ * best-effort-grouping-what-is-left, because the administrator picked a set and
+ * a different set is not what they approved.
+ */
+export async function crearGrupoSugerencias(
+  client: GruposClient,
+  titulo: string,
+  sugerenciaIds: readonly number[],
+  creadoPor: number,
+): Promise<SugerenciaAdminDTO[]> {
+  return client.$transaction(async (tx) => {
+    const seleccionadas = await tx.sugerencia.findMany({
+      where: { id: { in: [...sugerenciaIds] } },
+      select: { id: true, grupoId: true },
+    });
+
+    if (seleccionadas.length !== sugerenciaIds.length) {
+      throw new AgrupacionRechazada("sugerencias_no_encontradas");
+    }
+
+    /* Read BEFORE the update: afterwards every one of them points at the new
+       group and the old memberships are unrecoverable. */
+    const gruposPrevios = gruposDe(seleccionadas);
+
+    const grupo = await tx.grupoSugerencia.create({ data: { titulo, creadoPor } });
+
+    await tx.sugerencia.updateMany({
+      where: { id: { in: [...sugerenciaIds] } },
+      data: { grupoId: grupo.id },
+    });
+
+    await disolverGruposSinMinimo(tx, gruposPrevios);
+
+    return listarSugerencias(tx);
+  });
+}
+
+/**
+ * Takes one suggestion out of its group.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  WHY THIS EXISTS AT ALL
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * The same argument item #15 made about the funnel's order. An administrator who
+ * files an idea into the wrong bucket needs a way back inside the portal; without
+ * one, the only correction is an edit against the database, and the feature the
+ * PRD describes as a convenience becomes a decision nobody can undo.
+ *
+ * DELETE and not a PATCH carrying `{ grupoId: null }`, matching the verb
+ * `app/api/enlaces/[id]` chose for its baja: the verb describes what happens to
+ * the RESOURCE the client addressed — this suggestion's membership — and the
+ * request needs no body to say it. Growing an existing group is deliberately NOT
+ * a second mode of this route; the screen regroups by selecting the members it
+ * wants and naming the group again, which is one control instead of two.
+ *
+ * Answers with the whole list, for the reason `crearGrupoSugerencias` states:
+ * removing the second-to-last member dissolves the group and frees a row the
+ * caller never named.
+ */
+export async function quitarSugerenciaDeGrupo(
+  client: GruposClient,
+  id: number,
+): Promise<SugerenciaAdminDTO[]> {
+  return client.$transaction(async (tx) => {
+    const actual = await tx.sugerencia.findUnique({ where: { id }, select: { grupoId: true } });
+
+    if (actual === null) {
+      throw new AgrupacionRechazada("sugerencia_no_encontrada");
+    }
+
+    /*
+     * Already loose. A 409 rather than a silent success, for the reason the
+     * same-state transition is refused: the caller is acting on a screen that
+     * disagrees with the database, and answering "done" would confirm an
+     * assumption instead of correcting it.
+     */
+    if (actual.grupoId === null) {
+      throw new AgrupacionRechazada("sin_grupo");
+    }
+
+    await tx.sugerencia.update({ where: { id }, data: { grupoId: null } });
+
+    await disolverGruposSinMinimo(tx, [actual.grupoId]);
+
+    return listarSugerencias(tx);
   });
 }

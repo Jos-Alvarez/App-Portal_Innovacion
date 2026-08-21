@@ -2,15 +2,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  agruparSugerencias,
   AVISO_SIN_ACTUALIZAR,
+  CONFIRMACION_QUITAR,
   ERROR_DE_RED,
+  ERROR_DE_RED_GRUPO,
+  ERROR_SIN_LISTA,
   ERROR_SIN_CONFIRMACION,
   OPCIONES_TODAS,
   RUTA_TODAS,
   cambiarEstado,
   confirmacionDeCambio,
+  confirmacionDeGrupo,
   obtenerTodas,
+  quitarDeGrupo,
+  RUTA_GRUPOS,
   rutaEstado,
+  rutaGrupoDeSugerencia,
 } from "./sugerencias-client";
 
 /**
@@ -29,6 +37,7 @@ const SUGERENCIA = {
   estado: "aprobada",
   fechaCreacion: "2026-08-21T14:30:00.000Z",
   autor: { nombre: "Ana Quispe", area: "Peajes" },
+  grupo: null,
   historial: [],
 };
 
@@ -214,6 +223,164 @@ describe("los mensajes de la pantalla", () => {
 
   it("ninguna frase de esta pantalla filtra códigos técnicos", () => {
     for (const frase of [AVISO_SIN_ACTUALIZAR, ERROR_DE_RED, ERROR_SIN_CONFIRMACION]) {
+      expect(frase).not.toMatch(/prisma|zod|sql|http|\b\d{3}\b/i);
+    }
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+ *  ÍTEM #16 — LA AGRUPACIÓN
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+const AGRUPADA = { ...SUGERENCIA, grupo: { id: 42, titulo: "Tableros de peajes" } };
+
+describe("las rutas de agrupación", () => {
+  it("apunta a la ruta que nombra el ADR 0003", () => {
+    expect(RUTA_GRUPOS).toBe("/api/sugerencias/grupos");
+  });
+
+  it("arma la ruta de la pertenencia de una sugerencia", () => {
+    expect(rutaGrupoDeSugerencia(31)).toBe("/api/sugerencias/31/grupo");
+  });
+});
+
+describe("agruparSugerencias", () => {
+  it("manda un POST con el título y los ids", async () => {
+    fetchMock().mockResolvedValue(respuesta({ sugerencias: [AGRUPADA] }, 201));
+
+    await agruparSugerencias("Tableros de peajes", [7, 12]);
+
+    const [ruta, init] = fetchMock().mock.calls[0] as [string, RequestInit];
+
+    expect(ruta).toBe("/api/sugerencias/grupos");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toEqual({
+      titulo: "Tableros de peajes",
+      sugerenciaIds: [7, 12],
+    });
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   *  DEVUELVE LA LISTA ENTERA, NO EL GRUPO QUE CREÓ
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Una escritura de agrupación llega a filas que quien llama nunca nombró:
+   * disolver el grupo anterior anula el `grupo_id` de un sobreviviente. Por eso
+   * la pantalla reemplaza su cache entera en vez de parchar una entrada — no hay
+   * entrada que parchar que alcance.
+   */
+  it("devuelve la lista completa cuando el servidor confirma", async () => {
+    fetchMock().mockResolvedValue(respuesta({ sugerencias: [AGRUPADA] }, 201));
+
+    await expect(agruparSugerencias("Peajes", [7, 12])).resolves.toEqual({
+      ok: true,
+      sugerencias: [AGRUPADA],
+    });
+  });
+
+  it("acepta el 201 como éxito, que es lo que contesta el alta", async () => {
+    fetchMock().mockResolvedValue(respuesta({ sugerencias: [] }, 201));
+
+    expect((await agruparSugerencias("Peajes", [7, 12])).ok).toBe(true);
+  });
+
+  it("reenvía sin tocar la frase del 409", async () => {
+    fetchMock().mockResolvedValue(
+      respuesta(
+        { codigo: "sugerencias_no_encontradas", mensaje: "Alguna de las sugerencias ya no existe." },
+        409,
+      ),
+    );
+
+    await expect(agruparSugerencias("Peajes", [7, 12])).resolves.toEqual({
+      ok: false,
+      mensaje: "Alguna de las sugerencias ya no existe.",
+    });
+  });
+
+  it("distingue el servidor inalcanzable, donde nada se escribió", async () => {
+    fetchMock().mockRejectedValue(new TypeError("Failed to fetch"));
+
+    await expect(agruparSugerencias("Peajes", [7, 12])).resolves.toEqual({
+      ok: false,
+      mensaje: ERROR_DE_RED_GRUPO,
+    });
+  });
+
+  /**
+   * La duda es más ancha acá que en el cambio de estado: una escritura de
+   * agrupación puede disolver un grupo y liberar una sugerencia que nadie nombró,
+   * así que "no cambió nada" es justamente lo que no se puede prometer cuando
+   * falta el cuerpo.
+   */
+  it("trata un 2xx sin lista como falla, y no promete que nada cambió", async () => {
+    fetchMock().mockResolvedValue(respuesta({ grupo: { id: 42 } }, 201));
+
+    await expect(agruparSugerencias("Peajes", [7, 12])).resolves.toEqual({
+      ok: false,
+      mensaje: ERROR_SIN_LISTA,
+    });
+    expect(ERROR_SIN_LISTA).not.toMatch(/no cambió|quedaron como estaban/i);
+    expect(ERROR_SIN_LISTA).toMatch(/actualiza/i);
+  });
+});
+
+describe("quitarDeGrupo", () => {
+  it("manda un DELETE a la pertenencia, sin cuerpo", async () => {
+    fetchMock().mockResolvedValue(respuesta({ sugerencias: [SUGERENCIA] }));
+
+    await quitarDeGrupo(31);
+
+    const [ruta, init] = fetchMock().mock.calls[0] as [string, RequestInit];
+
+    expect(ruta).toBe("/api/sugerencias/31/grupo");
+    expect(init.method).toBe("DELETE");
+    expect(init.body).toBeUndefined();
+  });
+
+  it("devuelve la lista completa, porque disolver libera una fila que nadie nombró", async () => {
+    fetchMock().mockResolvedValue(respuesta({ sugerencias: [SUGERENCIA] }));
+
+    await expect(quitarDeGrupo(31)).resolves.toEqual({ ok: true, sugerencias: [SUGERENCIA] });
+  });
+
+  it("reenvía la frase del 409 cuando ya estaba suelta", async () => {
+    fetchMock().mockResolvedValue(
+      respuesta({ codigo: "sugerencia_sin_grupo", mensaje: "Ya no está en ningún grupo." }, 409),
+    );
+
+    await expect(quitarDeGrupo(31)).resolves.toEqual({
+      ok: false,
+      mensaje: "Ya no está en ningún grupo.",
+    });
+  });
+
+  it("distingue el servidor inalcanzable", async () => {
+    fetchMock().mockRejectedValue(new TypeError("Failed to fetch"));
+
+    await expect(quitarDeGrupo(31)).resolves.toEqual({ ok: false, mensaje: ERROR_DE_RED_GRUPO });
+  });
+});
+
+describe("los mensajes de la agrupación", () => {
+  it("confirma diciendo cuántas se agruparon", () => {
+    expect(confirmacionDeGrupo(3)).toBe("Agrupamos 3 sugerencias.");
+  });
+
+  it("confirma la salida del grupo", () => {
+    expect(CONFIRMACION_QUITAR).toMatch(/salió del grupo/i);
+  });
+
+  /** Agrupar no toca el estado, así que ninguna frase de acá puede hablar de uno. */
+  it("ninguna frase de agrupación habla del estado de una sugerencia", () => {
+    for (const frase of [ERROR_DE_RED_GRUPO, ERROR_SIN_LISTA, CONFIRMACION_QUITAR]) {
+      expect(frase).not.toMatch(/pendiente|revisión|aprobada|rechazada|implementada/i);
+    }
+  });
+
+  it("ninguna frase de esta pantalla filtra códigos técnicos", () => {
+    for (const frase of [ERROR_DE_RED_GRUPO, ERROR_SIN_LISTA, CONFIRMACION_QUITAR]) {
       expect(frase).not.toMatch(/prisma|zod|sql|http|\b\d{3}\b/i);
     }
   });
