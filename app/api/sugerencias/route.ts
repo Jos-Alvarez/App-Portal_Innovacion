@@ -2,9 +2,14 @@ import { NextResponse } from "next/server";
 
 import { failureResponse } from "@/lib/api/errors";
 import { guardRoute } from "@/lib/authz";
+import { programarNotificacion } from "@/lib/correo/notificar";
 import { prisma } from "@/lib/prisma";
 import { ERROR_INTERNO, errorDePrisma, errorDeValidacion } from "@/lib/sugerencias/errors";
-import { crearSugerencia, listarSugerenciasDeAutor } from "@/lib/sugerencias/repository";
+import {
+  type SugerenciaDTO,
+  crearSugerencia,
+  listarSugerenciasDeAutor,
+} from "@/lib/sugerencias/repository";
 import { crearSugerenciaSchema } from "@/lib/sugerencias/schema";
 
 /**
@@ -49,11 +54,12 @@ import { crearSugerenciaSchema } from "@/lib/sugerencias/schema";
  *  WHAT THIS ROUTE DELIBERATELY DOES NOT DO
  * ══════════════════════════════════════════════════════════════════════════
  *
- * It does not send mail. That is item #14, and the PRD has already settled its
- * shape: the send is best-effort and a failure "se ignora silenciosamente. La
- * sugerencia no se pierde porque ya está garantizada en la base de datos". When
- * #14 lands it hooks in AFTER the insert has succeeded and can never turn a
- * saved suggestion into a failed request.
+ * It does not WAIT for mail. Item #14 landed and hooks in exactly where this
+ * comment predicted — after the insert has succeeded, outside the `try` that
+ * owns the answer, through `programarNotificacion`, which returns `void` and
+ * cannot throw. The PRD settles the shape: the send is best-effort and a failure
+ * "se ignora silenciosamente. La sugerencia no se pierde porque ya está
+ * garantizada en la base de datos". See `lib/correo/notificar.ts`.
  *
  * It records no `evento_uso`. That table's vocabulary is closed by a database
  * CHECK constraint over `apertura`, `ejecucion` and the five typed processing
@@ -108,6 +114,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     return failureResponse(errorDeValidacion(datos.error));
   }
 
+  let sugerencia: SugerenciaDTO;
+
   try {
     /*
      * `acceso.usuario.id` is the author, never a field of the body. The session
@@ -115,12 +123,29 @@ export async function POST(request: Request): Promise<NextResponse> {
      * even carry an `autorId` key for a client to try — so writing a suggestion
      * in somebody else's name is not something this route can be talked into.
      */
-    const sugerencia = await crearSugerencia(prisma, acceso.usuario.id, datos.data);
-
-    return NextResponse.json({ sugerencia }, { status: 201 });
+    sugerencia = await crearSugerencia(prisma, acceso.usuario.id, datos.data);
   } catch (error) {
     /* The detail stays in the server log; the browser gets a code and a Spanish sentence. */
     console.error("POST /api/sugerencias", error);
     return failureResponse(errorDePrisma(error));
   }
+
+  /*
+   * ════════════════════════════════════════════════════════════════════════
+   *  THE ROW EXISTS. NOTHING BELOW MAY CHANGE THE ANSWER — ITEM #14
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Deliberately OUTSIDE the `try` above, and that is the whole design in one
+   * line of placement. Inside it, a throw from the notification would be caught
+   * by a `catch` that answers `errorDePrisma` — a 500 blaming the database for a
+   * write that succeeded, sending the author back to resend an idea the portal
+   * already has. Out here there is no handler left to get it wrong.
+   *
+   * `programarNotificacion` returns `void` and swallows everything by contract,
+   * so this call cannot delay the 201 and cannot fail it. The mail is a
+   * convenience; the row is the record.
+   */
+  programarNotificacion(sugerencia, acceso.usuario);
+
+  return NextResponse.json({ sugerencia }, { status: 201 });
 }

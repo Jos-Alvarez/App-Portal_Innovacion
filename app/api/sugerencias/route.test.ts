@@ -10,14 +10,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * repository and the error mapping in between are the real code.
  */
 
-const { guardRoute, sugerencia, usuario } = vi.hoisted(() => ({
+const { guardRoute, sugerencia, usuario, programarNotificacion } = vi.hoisted(() => ({
   guardRoute: vi.fn(),
   sugerencia: { create: vi.fn(), findMany: vi.fn() },
   usuario: { findUnique: vi.fn() },
+  programarNotificacion: vi.fn(),
 }));
 
 vi.mock("@/lib/authz", () => ({ guardRoute }));
 vi.mock("@/lib/prisma", () => ({ prisma: { sugerencia, usuario } }));
+/*
+ * The notification of item #14 is replaced for the same reason the guard is: the
+ * real one calls `after`, which throws outside a request scope, and what this
+ * suite is about is WHEN the route asks for it and whether the answer survives
+ * it. What the notification then does with the ask is `lib/correo`'s own suite.
+ */
+vi.mock("@/lib/correo/notificar", () => ({ programarNotificacion }));
 
 import { NextResponse } from "next/server";
 
@@ -275,17 +283,52 @@ describe("POST /api/sugerencias", () => {
   });
 
   /**
-   * El correo es el ítem #14 y el PRD ya cerró su forma: best-effort, y su fallo
-   * "se ignora silenciosamente. La sugerencia no se pierde porque ya está
-   * garantizada en la base de datos". Hoy esta ruta no manda nada, y cuando #14
-   * llegue debe engancharse DESPUÉS del insert, sin poder convertir una
-   * sugerencia guardada en una petición fallida.
+   * ══════════════════════════════════════════════════════════════════════════
+   *  EL AVISO POR CORREO — ÍTEM #14
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * El PRD cerró su forma: best-effort, y su fallo "se ignora silenciosamente.
+   * La sugerencia no se pierde porque ya está garantizada en la base de datos".
+   * Estas cuatro pruebas son esa frase, en orden: se avisa con lo que se guardó,
+   * solo si se guardó, sin esperarlo y sin que pueda romper la respuesta.
    */
-  it("no intenta mandar correo todavía: eso es el ítem #14", async () => {
+  it("programa el aviso con la sugerencia creada y con el autor de la sesión", async () => {
+    await POST(pedido(CUERPO));
+
+    expect(programarNotificacion).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 31, titulo: "Tablero de peajes" }),
+      expect.objectContaining({ nombre: "Ana Quispe", correo: "ana@limaexpresa.pe" }),
+    );
+  });
+
+  it("no avisa de nada cuando el insert falló: no hay sugerencia de la que avisar", async () => {
+    sugerencia.create.mockRejectedValue({ code: "P2003" });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await POST(pedido(CUERPO));
+
+    expect(programarNotificacion).not.toHaveBeenCalled();
+  });
+
+  it("no manda el correo dentro de la petición: la respuesta no espera a la API de correo", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
 
     await POST(pedido(CUERPO));
 
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  /**
+   * El Área de Innovación y el autor tienen que estar leyendo lo mismo. Si el
+   * correo se armara con otra cosa que lo devuelto —el cuerpo del pedido, por
+   * ejemplo, en vez de la fila guardada— el aviso podría llevar un id que no
+   * existe o un estado que la fila no tiene, y nadie lo notaría hasta que un
+   * administrador buscara esa sugerencia en el panel y no estuviera.
+   */
+  it("avisa con exactamente la misma sugerencia que le devuelve al autor", async () => {
+    const response = await POST(pedido(CUERPO));
+    const { sugerencia: devuelta } = await response.json();
+
+    expect(programarNotificacion).toHaveBeenCalledWith(devuelta, expect.anything());
   });
 });
