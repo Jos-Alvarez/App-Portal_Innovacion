@@ -1,0 +1,152 @@
+/*
+ * La gestión de sugerencias. Nothing here is a new component: the chips, the
+ * buttons, the toast and the empty state are the shared ones. This file lays
+ * them out.
+ *
+ * The card, its header, its description and its ledger are deliberately the same
+ * geometry as `app/(portal)/sugerencias/sugerencias.module.css`, because the two
+ * screens render the SAME ROW to two different readers — an administrator
+ * checking what an author is looking at should be looking at the same object.
+ * The rules are repeated rather than imported: CSS Modules scope class names per
+ * file, so sharing them would mean a third stylesheet imported by both, and the
+ * shape that actually differs (the row of review buttons, the filter bar) would
+ * still live here. Two copies of eight declarations is the cheaper of the two.
+ */
+
+.main {
+  display: grid;
+  gap: 24px;
+  align-content: start;
+  max-width: 1100px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 28px 24px 64px;
+}
+
+.header {
+  display: grid;
+  gap: 6px;
+}
+
+/* Chips de filtro: pill, activo = navy relleno, inactivo = borde + --muted. */
+.filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Error de acción: el rojo solo aparece aquí, nunca decorativo. */
+.alerta {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 7px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: var(--fs-body-sm);
+  font-weight: 600;
+}
+
+/*
+ * Advertencia, no error: lo que se ve sigue siendo válido, sólo puede estar un
+ * minuto atrasado. DESIGN.md reserva el rojo para error y destrucción.
+ */
+.aviso {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 7px;
+  background: var(--warn-bg);
+  color: var(--warn);
+  font-size: var(--fs-body-sm);
+  font-weight: 600;
+}
+
+.listado {
+  display: grid;
+  gap: 14px;
+}
+
+.listadoTitulo {
+  margin: 0;
+  font-size: var(--fs-body);
+  font-weight: 700;
+}
+
+/* Tarjetas y paneles: --surface + borde 1px + radio 12–16px + --shadow. */
+.tarjeta {
+  display: grid;
+  gap: 10px;
+  padding: 20px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.tarjetaHeader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tarjetaTitulo {
+  margin: 0;
+  font-size: var(--fs-body);
+  font-weight: 700;
+}
+
+/*
+ * `pre-line`: los saltos de línea que escribió la persona son parte de lo que
+ * escribió, y el navegador no tiene por qué colapsarlos. `overflow-wrap` evita
+ * que una palabra larguísima ensanche la tarjeta.
+ */
+.descripcion {
+  margin: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+/*
+ * Los cinco botones del embudo. `wrap` porque en pantallas angostas cinco
+ * etiquetas no entran en una línea, y DESIGN.md pide `white-space: nowrap` en
+ * cada botón: sin el wrap del contenedor, la fila desbordaría la tarjeta.
+ */
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.historial {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.historialTitulo {
+  margin: 0;
+  color: var(--muted);
+}
+
+.historialLista {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.asiento {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+}
+
+.transicion {
+  font-size: var(--fs-body-sm);
+  font-weight: 600;
+}
