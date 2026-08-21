@@ -16,34 +16,6 @@
   padding: 20px 24px 64px;
 }
 
-.topbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  align-items: center;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border);
-}
-
-.separador {
-  width: 1px;
-  align-self: stretch;
-  min-height: 28px;
-  background: var(--border);
-}
-
-.marca {
-  font-weight: 700;
-  color: var(--navy-fg);
-}
-
-.sesion {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  margin-left: auto;
-}
-
 /*
  * The way back, above the title rather than beside it: this screen is reached
  * from the dashboard and DESIGN.md's Sin permiso state offers the same exit, so

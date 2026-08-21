@@ -1,7 +1,6 @@
 import Link from "next/link";
 
-import { LOGO_SIZE_TOPBAR, Logo } from "@/components/logo/logo";
-import { ThemeToggle } from "@/components/theme-toggle/theme-toggle";
+import { Topbar } from "@/components/topbar/topbar";
 import { guardPage } from "@/lib/authz";
 import { listarRecursosAsignados } from "@/lib/mis-recursos/repository";
 import { prisma } from "@/lib/prisma";
@@ -73,21 +72,10 @@ export default async function PortalPage() {
 
   return (
     <main className={styles.main}>
-      {/* DESIGN.md "Logo": "topbar (58px + separador vertical + 'Portal de
-          Innovación')". The lockup is composition, so it lives here and not in
-          the Logo component. */}
-      <div className={styles.topbar}>
-        <Logo size={LOGO_SIZE_TOPBAR} preload />
-        <span className={styles.separador} aria-hidden="true" />
-        <span className={styles.marca}>Portal de Innovación</span>
-
-        <div className={styles.sesion}>
-          {/* The name the guard re-read from SQL Server on this request, not one
-              carried in the session token. */}
-          <span className="lx-meta">{acceso.usuario.nombre}</span>
-          <ThemeToggle />
-        </div>
-      </div>
+      {/* The lockup, the theme toggle, the way out and — for an administrator —
+          the door to the role screen (item #17). `preloadLogo` because this is
+          the screen a reader lands on after signing in. */}
+      <Topbar usuario={acceso.usuario} preloadLogo />
 
       <header className={styles.header}>
         <h1>Mis recursos</h1>
@@ -108,13 +96,13 @@ export default async function PortalPage() {
           * dashboard is empty, which makes it the one place a link is certain
           * to be seen.
           *
-          * NOT IN THE TOPBAR, though that is where a navigation link would
-          * normally go. The topbar lockup is currently copied into each screen
-          * that has one rather than extracted, so putting the link there would
-          * mean either editing every copy or shipping a portal whose topbar
-          * gains and loses an entry depending on the page. Extracting a shared
-          * topbar is worth doing — item #17 adds a second button beside the
-          * theme toggle and will need it — and it is not this item's to do.
+          * STILL NOT IN THE TOPBAR, and now for a different reason. Item #17
+          * extracted the shared `Topbar` this comment asked for, so the old
+          * objection — three copies to edit — is gone. What the bar holds is the
+          * session cluster: who you are, how the portal looks, the role screen
+          * if you administer it, and the way out. The buzón is not about the
+          * session; it is this screen's own invitation, and it belongs beside
+          * the words that explain what the screen is.
           *
           * SECONDARY, not primary. DESIGN.md allows "una acción primaria (navy)
           * por vista"; this view's rows already carry the actions, and the navy

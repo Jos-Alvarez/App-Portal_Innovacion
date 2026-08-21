@@ -1,7 +1,6 @@
 import Link from "next/link";
 
-import { LOGO_SIZE_TOPBAR, Logo } from "@/components/logo/logo";
-import { ThemeToggle } from "@/components/theme-toggle/theme-toggle";
+import { Topbar } from "@/components/topbar/topbar";
 import { guardPage } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { leerAreaDelAutor, listarSugerenciasDeAutor } from "@/lib/sugerencias/repository";
@@ -76,21 +75,10 @@ export default async function SugerenciasPage() {
 
   return (
     <main className={styles.main}>
-      {/* DESIGN.md "Logo": "topbar (58px + separador vertical + 'Portal de
-          Innovación')". The lockup is composition, so it lives here and not in
-          the Logo component. */}
-      <div className={styles.topbar}>
-        <Logo size={LOGO_SIZE_TOPBAR} />
-        <span className={styles.separador} aria-hidden="true" />
-        <span className={styles.marca}>Portal de Innovación</span>
-
-        <div className={styles.sesion}>
-          {/* The name the guard re-read from SQL Server on this request, not one
-              carried in the session token. */}
-          <span className="lx-meta">{acceso.usuario.nombre}</span>
-          <ThemeToggle />
-        </div>
-      </div>
+      {/* The shared bar item #17 extracted: identity, theme, the role screen for
+          an administrator, and the way out. No `preloadLogo` — the reader
+          arrived here from another screen that already loaded the asset. */}
+      <Topbar usuario={acceso.usuario} />
 
       {/* `Link` and not an anchor: this is an internal navigation and the client
           router should handle it without a full document load. */}

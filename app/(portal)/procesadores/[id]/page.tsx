@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { LOGO_SIZE_TOPBAR, Logo } from "@/components/logo/logo";
-import { ThemeToggle } from "@/components/theme-toggle/theme-toggle";
+import { Topbar } from "@/components/topbar/topbar";
 import { guardPageResource } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { leerProcesador } from "@/lib/procesadores/repository";
@@ -88,18 +87,9 @@ export default async function ProcesadorPage({ params }: Props) {
 
   return (
     <main className={styles.main}>
-      <div className={styles.topbar}>
-        <Logo size={LOGO_SIZE_TOPBAR} />
-        <span className={styles.separador} aria-hidden="true" />
-        <span className={styles.marca}>Portal de Innovación</span>
-
-        <div className={styles.sesion}>
-          {/* The name the guard re-read from SQL Server on this request, not one
-              carried in the session token. */}
-          <span className="lx-meta">{acceso.usuario.nombre}</span>
-          <ThemeToggle />
-        </div>
-      </div>
+      {/* The shared bar item #17 extracted: identity, theme, the role screen for
+          an administrator, and the way out. */}
+      <Topbar usuario={acceso.usuario} />
 
       {/* `Link` and not an anchor: this is an internal navigation and the client
           router should handle it without a full document load. */}

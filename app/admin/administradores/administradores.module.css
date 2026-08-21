@@ -1,0 +1,132 @@
+/*
+ * The administrator screen. Nothing here is a new component: the input, the
+ * button, the table, the chips, the toast and the empty state are the shared
+ * ones. This file lays them out and dresses the one thing the components layer
+ * does not ship — a result row, which is a person plus one action and is not a
+ * table because it has no columns worth aligning.
+ */
+
+.main {
+  display: grid;
+  gap: 24px;
+  align-content: start;
+  max-width: 1100px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 28px 24px 64px;
+}
+
+.header {
+  display: grid;
+  gap: 6px;
+}
+
+/* The field and its button on one line, wrapping together on a narrow screen. */
+.busqueda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.busqueda > :first-child {
+  flex: 1 1 260px;
+}
+
+/* Error de acción: el rojo solo aparece aquí, nunca decorativo. */
+.alerta {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 7px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: var(--fs-body-sm);
+  font-weight: 600;
+}
+
+.resultados,
+.actuales {
+  display: grid;
+  gap: 14px;
+}
+
+.subtitulo {
+  margin: 0;
+  font-size: var(--fs-body);
+  font-weight: 700;
+}
+
+.listaResultados {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.resultado {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.persona {
+  display: grid;
+  gap: 2px;
+}
+
+.personaNombre {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-weight: 600;
+}
+
+/* A deactivated account is still listed; the name says so at a glance. */
+.personaNombre[data-baja="true"] {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.tabla {
+  padding: 8px 24px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  overflow-x: auto;
+}
+
+.filaAcciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.confirmacion {
+  font-size: var(--fs-meta);
+  font-weight: 600;
+}
+
+/* Destructivo: DESIGN.md reserva el rojo para error y destrucción. */
+.destructivo {
+  color: var(--danger);
+}
+
+.destructivo:hover:not(:disabled) {
+  background: var(--danger-bg);
+}

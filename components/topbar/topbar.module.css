@@ -1,0 +1,46 @@
+/*
+ * The topbar lockup, moved here from the three screens that each carried a copy
+ * of it (items #8, #10 and #13). The rules are unchanged: this is an extraction,
+ * not a redesign, so the bar looks exactly as it did before item #17.
+ */
+
+/*
+ * DESIGN.md "Logo": "topbar (58px + separador vertical + 'Portal de
+ * Innovación')". The logo component deliberately ships without the lockup — it
+ * is composition — so this is where the pieces meet.
+ */
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.separador {
+  width: 1px;
+  align-self: stretch;
+  min-height: 28px;
+  background: var(--border);
+}
+
+.marca {
+  font-weight: 700;
+  color: var(--navy-fg);
+}
+
+/*
+ * Pushes the identity and the actions to the far end of the bar.
+ *
+ * `flex-wrap` is what keeps the cluster usable on a narrow screen now that it
+ * holds four things instead of two: the buttons drop to their own line rather
+ * than squeezing the name out of the bar.
+ */
+.sesion {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  margin-left: auto;
+}
