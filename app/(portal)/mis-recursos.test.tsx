@@ -146,36 +146,49 @@ describe("MisRecursos", () => {
     });
   });
 
-  describe("el procesador, que todavía no se puede ejecutar", () => {
+  describe("la acción de ejecutar un procesador", () => {
     it("aparece en la lista: está asignado", () => {
       render(montar([PROCESADOR]));
 
       expect(screen.getByText("Maestro de Excel")).toBeInTheDocument();
     });
 
-    it("no ofrece ningún enlace ni botón que no lleve a ninguna parte", () => {
+    /*
+     * El ítem #10 reemplazó el rótulo «Disponible próximamente» por un enlace de
+     * verdad. La pantalla existe, así que la fila ya no tiene por qué pedir
+     * disculpas.
+     */
+    it("lleva a la pantalla de ejecución del portal", () => {
       render(montar([PROCESADOR]));
 
-      const suFila = fila("Maestro de Excel");
+      const ejecutar = within(fila("Maestro de Excel")).getByRole("link");
 
-      expect(within(suFila).queryByRole("link")).not.toBeInTheDocument();
-      expect(within(suFila).queryByRole("button")).not.toBeInTheDocument();
+      expect(ejecutar).toHaveAttribute("href", "/procesadores/4");
     });
 
-    it("dice en la fila que su ejecución todavía no está disponible", () => {
+    /*
+     * A diferencia del enlace externo, el procesador se queda en esta pestaña:
+     * es una pantalla del portal donde la persona trabaja hasta dos minutos y
+     * recibe una descarga, y ya trae su propia vuelta al panel.
+     */
+    it("se queda en la misma pestaña, al contrario que un enlace externo", () => {
       render(montar([PROCESADOR]));
 
-      expect(within(fila("Maestro de Excel")).getByText("Disponible próximamente")).toBeInTheDocument();
+      const ejecutar = within(fila("Maestro de Excel")).getByRole("link");
+
+      expect(ejecutar).not.toHaveAttribute("target");
     });
 
-    it("explica una sola vez quién avisará cuando se habilite", () => {
+    it("nombra el recurso en la acción, porque todas las filas dicen «Ejecutar»", () => {
+      render(montar([PROCESADOR]));
+
+      expect(
+        screen.getByRole("link", { name: /Ejecutar Maestro de Excel/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("ya no explica ninguna espera debajo de la tabla", () => {
       render(montar([PROCESADOR, APP]));
-
-      expect(screen.getByText(/el Área de Innovación te avisará/i)).toBeInTheDocument();
-    });
-
-    it("calla esa explicación cuando no hay ningún procesador asignado", () => {
-      render(montar([APP, AGENTE]));
 
       expect(screen.queryByText(/el Área de Innovación te avisará/i)).not.toBeInTheDocument();
     });

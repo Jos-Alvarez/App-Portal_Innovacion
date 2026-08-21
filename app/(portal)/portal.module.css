@@ -87,21 +87,3 @@
   font-weight: 600;
 }
 
-/*
- * The procesador's cell. Same box as the "Abrir" anchor beside it so the column
- * does not jump, but muted and without any of the affordances of a control —
- * no border, no fill, no pointer.
- */
-.sinAccion {
-  display: inline-block;
-  padding: 9px 0;
-  color: var(--muted);
-  font-size: var(--fs-body-sm);
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.nota {
-  margin: 0;
-  max-width: 70ch;
-}

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import useSWR from "swr";
 
 import { StatusChip } from "@/components/chip/chip";
@@ -99,45 +100,48 @@ const VACIO_DESCRIPCION =
   "portal. En cuanto te asignen alguno, aparecerá aquí.";
 
 /**
- * ══════════════════════════════════════════════════════════════════════════
- *  A PROCESADOR IS LISTED, AND IT IS NOT OFFERED
- * ══════════════════════════════════════════════════════════════════════════
- *
- * The execution screen is item #10. Until it exists there is nothing to click,
- * and the dashboard has to be honest about that without looking broken.
- *
- * WHY NOT A DISABLED BUTTON. DESIGN.md describes the disabled state ("opacity
- * .5 + cursor not-allowed, nunca ocultarlo") for a control that exists and is
- * momentarily unavailable — a form mid-submit. A permanently disabled "Ejecutar"
- * says something different and worse: it reads as a control that works for other
- * people and not for you, which is precisely what the Sin permiso screen means.
- * The collaborator DOES have this assignment; the portal is the part that is not
- * ready.
- *
- * WHY NOT A LINK TO A FUTURE ROUTE. `/procesadores/{id}` does not exist, so it
- * would 404 — a dead link that turns "not built yet" into "broken".
- *
- * So the cell is text, not a control: nothing invites a click, and the row still
- * confirms the assignment the collaborator has. The full explanation appears
- * once below the table rather than in every row, because repeating it per row
- * would make the wait louder than the resources that do work.
- */
-const PROCESADOR_SIN_ACCION = "Disponible próximamente";
-
-const NOTA_PROCESADORES =
-  "Los procesadores de la lista ya están asignados a tu cuenta. Su ejecución desde el portal se " +
-  "habilitará más adelante; el Área de Innovación te avisará cuando esté disponible.";
-
-/**
  * The action of one row.
  *
  * An `app` and an `agente` are opened the same way — the repository's own
- * comment says so — so the only branch here is the one between opening and not
- * being able to yet.
+ * comment says so — so the only branch here is between opening an address and
+ * going to a screen.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  ITEM #10 REPLACED A LABEL WITH A LINK, AND THE TWO ARE NOT THE SAME KIND OF
+ *  DESTINATION
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * Until this item shipped, a procesador row said "Disponible próximamente" as
+ * plain text: the execution screen did not exist, and a link to it would have
+ * 404ed while a disabled button would have read as a permission the reader did
+ * not have. Both are now moot — the screen exists at `/procesadores/{id}`.
+ *
+ * WHY THIS ONE IS `Link` AND THE ENLACE IS AN ANCHOR. They are different
+ * journeys, not two spellings of one. An enlace leaves the portal for an
+ * external address, in a new tab, through a route that answers 302 — so it must
+ * be a real anchor the browser navigates. A procesador stays inside the portal,
+ * in this tab, on a page the client router can render without a document load.
+ * Using an anchor here would throw away the router; using `Link` there would
+ * not survive the redirect.
+ *
+ * WHY NOT A NEW TAB EITHER. The execution screen is where the reader works for
+ * up to two minutes and receives a download; sending them to a second tab would
+ * separate that work from the portal they came from, and the screen already
+ * carries its own way back.
  */
 function accion(recurso: RecursoAsignado) {
   if (recurso.tipo === "procesador") {
-    return <span className={styles.sinAccion}>{PROCESADOR_SIN_ACCION}</span>;
+    return (
+      <Link
+        className="lx-btn lx-btn-secondary"
+        href={`/procesadores/${recurso.id}`}
+        /* Every row's action says the same word; the name is what tells them
+           apart for anyone navigating by link. */
+        aria-label={`Ejecutar ${recurso.nombre}`}
+      >
+        Ejecutar
+      </Link>
+    );
   }
 
   return (
@@ -233,6 +237,12 @@ export function MisRecursos({ recursosIniciales }: MisRecursosProps) {
         <EmptyState title={VACIO_TITULO} description={VACIO_DESCRIPCION} />
       ) : (
         <>
+          {/*
+            * The note that used to sit under this table — explaining that
+            * procesadores were assigned but not yet runnable — went away with
+            * item #10, along with the wait it was apologising for. Every row in
+            * this list now has an action that works.
+            */}
           <div className={styles.tabla}>
             <Table
               caption="Recursos asignados a tu cuenta"
@@ -243,10 +253,6 @@ export function MisRecursos({ recursosIniciales }: MisRecursosProps) {
               rowKey={(recurso) => `${recurso.tipo}-${recurso.id}`}
             />
           </div>
-
-          {recursos.some((recurso) => recurso.tipo === "procesador") ? (
-            <p className={`${styles.nota} lx-meta`}>{NOTA_PROCESADORES}</p>
-          ) : null}
         </>
       )}
     </>

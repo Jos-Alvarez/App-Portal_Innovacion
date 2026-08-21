@@ -1,0 +1,172 @@
+/*
+ * The execution screen. Like the dashboard's stylesheet, nothing here is a new
+ * component: the button and the toast are the shared ones. What this file
+ * dresses are the three things the components layer does not ship — the
+ * contract card, the file field, and the red banner DESIGN.md specifies for
+ * processor errors.
+ */
+
+.main {
+  display: grid;
+  gap: 24px;
+  align-content: start;
+  max-width: 1100px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 20px 24px 64px;
+}
+
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.separador {
+  width: 1px;
+  align-self: stretch;
+  min-height: 28px;
+  background: var(--border);
+}
+
+.marca {
+  font-weight: 700;
+  color: var(--navy-fg);
+}
+
+.sesion {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-left: auto;
+}
+
+/*
+ * The way back, above the title rather than beside it: this screen is reached
+ * from the dashboard and DESIGN.md's Sin permiso state offers the same exit, so
+ * a reader who lands here by URL has one too.
+ */
+.volver {
+  justify-self: start;
+}
+
+.header {
+  display: grid;
+  gap: 6px;
+}
+
+/* Densidad cómoda: "padding 20-28px en tarjetas". */
+.ejecucion {
+  display: grid;
+  gap: 20px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.contrato {
+  display: grid;
+  gap: 10px;
+}
+
+.reglas {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: var(--fs-body-sm);
+}
+
+.campo {
+  display: grid;
+  gap: 6px;
+}
+
+.etiqueta {
+  color: var(--muted);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-label);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+}
+
+/*
+ * A file input cannot be restyled the way a text input can — the button inside
+ * it belongs to the browser — so this dresses the frame and leaves the control
+ * alone. DESIGN.md's input geometry (radio 9px, borde --border, foco cian) is
+ * kept on the part that is ours to keep it on.
+ */
+.archivo {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.archivo:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 1px;
+}
+
+.archivo:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/*
+ * "Errores de procesador: banner rojo con título 700 + motivo específico
+ * (formato / tamaño / contenido) + Reintentar." The red is the semantic danger
+ * token over its soft background, the same pair the Error state uses, so the
+ * two read as one system.
+ */
+.banner {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding: 16px 18px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-control);
+  background: var(--danger-bg);
+}
+
+.bannerTitulo {
+  margin: 0;
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.bannerMotivo {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--fs-body-sm);
+}
+
+/*
+ * Ámbar, no rojo: nothing has failed while this is on screen. DESIGN.md
+ * reserves red for errors and destructive actions, and a two-minute wait is
+ * neither.
+ */
+.progreso {
+  margin: 0;
+  padding: 12px 14px;
+  border-left: 3px solid var(--warn);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--warn) 10%, var(--surface));
+  color: var(--text);
+  font-size: var(--fs-body-sm);
+}
+
+.acciones {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
