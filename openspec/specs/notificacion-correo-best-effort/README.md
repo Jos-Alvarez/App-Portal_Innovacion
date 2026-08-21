@@ -223,6 +223,15 @@ them.
    template is now consistent with every env reader in both directions — nothing required is
    missing, nothing listed goes unread.
 
+   The groups were then re-cut along the line that actually matters. Group A used to mean "required
+   now" and held only the two database URLs; it now holds everything without which the portal will
+   not start or will let nobody in — the database and the login — all uncommented with placeholders,
+   so copying the template fails on a *value* rather than on an absence. `AUTH_URL` and `ADMIN_EMAIL`
+   sit there too but stay commented, because `lib/auth/env.ts` does not require them and an
+   unreplaced placeholder would be worse than their absence: a wrong `AUTH_URL` breaks the login
+   callback. Group B stopped meaning "no consumer yet" — every variable in it has one — and now means
+   "does not block startup": each block names the single feature that fails without it.
+
 3. **A link into the admin panel would make the mail far more useful, and it needs `AUTH_URL`.** The
    body tells the reader to go to the portal but cannot say where, because building an absolute URL
    means depending on a variable this item otherwise does not touch (`AUTH_URL`, reserved for item
