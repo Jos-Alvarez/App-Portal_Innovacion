@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { LOGO_SIZE_TOPBAR, Logo } from "@/components/logo/logo";
 import { ThemeToggle } from "@/components/theme-toggle/theme-toggle";
 import { guardPage } from "@/lib/authz";
@@ -93,6 +95,34 @@ export default async function PortalPage() {
           Las aplicaciones, los agentes de IA y los procesadores que el Área de Innovación asignó a
           tu cuenta.
         </p>
+
+        {/*
+          * ══════════════════════════════════════════════════════════════════
+          *  THE WAY INTO THE BUZÓN (ITEM #13), AND WHY IT IS HERE
+          * ══════════════════════════════════════════════════════════════════
+          *
+          * The suggestions box is open to everyone — the PRD puts it outside
+          * the assignment system entirely — so it needs a door that does not
+          * depend on anything being assigned. This is the screen every
+          * collaborator lands on after signing in, including the ones whose
+          * dashboard is empty, which makes it the one place a link is certain
+          * to be seen.
+          *
+          * NOT IN THE TOPBAR, though that is where a navigation link would
+          * normally go. The topbar lockup is currently copied into each screen
+          * that has one rather than extracted, so putting the link there would
+          * mean either editing every copy or shipping a portal whose topbar
+          * gains and loses an entry depending on the page. Extracting a shared
+          * topbar is worth doing — item #17 adds a second button beside the
+          * theme toggle and will need it — and it is not this item's to do.
+          *
+          * SECONDARY, not primary. DESIGN.md allows "una acción primaria (navy)
+          * por vista"; this view's rows already carry the actions, and the navy
+          * fill belongs to the send button on the screen this link leads to.
+          */}
+        <Link className={`lx-btn lx-btn-secondary ${styles.buzon}`} href="/sugerencias">
+          Buzón de sugerencias
+        </Link>
       </header>
 
       <MisRecursos recursosIniciales={recursos} />

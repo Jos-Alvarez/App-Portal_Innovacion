@@ -1,0 +1,250 @@
+/*
+ * El buzón de sugerencias. Nothing here is a new component: the inputs, the
+ * button, the chips, the toast and the empty state are the shared ones. This
+ * file lays them out and dresses the two things the components layer does not
+ * ship — the topbar lockup DESIGN.md describes as composition, and a <textarea>
+ * — with the very treatment "Componentes" already prescribes for inputs, which
+ * is what `app/admin/enlaces/enlaces.module.css` does with its <select>.
+ */
+
+.main {
+  display: grid;
+  gap: 24px;
+  align-content: start;
+  max-width: 900px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 20px 24px 64px;
+}
+
+/*
+ * DESIGN.md "Logo": "topbar (58px + separador vertical + 'Portal de
+ * Innovación')". The logo component deliberately ships without the lockup — it
+ * is composition — so this is where the three pieces meet.
+ */
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.separador {
+  width: 1px;
+  align-self: stretch;
+  min-height: 28px;
+  background: var(--border);
+}
+
+.marca {
+  font-weight: 700;
+  color: var(--navy-fg);
+}
+
+/* Pushes the identity and the theme toggle to the far end of the bar. */
+.sesion {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.volver {
+  justify-self: start;
+}
+
+.header {
+  display: grid;
+  gap: 6px;
+}
+
+/* Tarjetas y paneles: --surface + borde 1px + radio 12–16px + --shadow. */
+.panel {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: var(--fs-body);
+  font-weight: 700;
+}
+
+/* Densidad cómoda: grids con gap 14–24px. */
+.fields {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  align-items: start;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+/* Matches the shared Input's label: body scale at 600, not the uppercase label. */
+.label {
+  font-size: var(--fs-body-sm);
+  font-weight: 600;
+}
+
+/*
+ * The same treatment as the shared Input — DESIGN.md: "fondo --bg, borde
+ * --border, radio 9px, foco cian (outline-color), error = borde rojo".
+ * `resize: vertical` and not `both`: growing sideways would break the card's
+ * own width, and the only direction a longer idea needs is down.
+ */
+.textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-body);
+  line-height: 1.5;
+  resize: vertical;
+  transition: border-color 0.15s ease;
+}
+
+.textarea::placeholder {
+  color: var(--muted);
+}
+
+.textarea:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 1px;
+}
+
+.textareaInvalid {
+  border-color: var(--danger);
+}
+
+/* Mismo mensaje de campo que el Input compartido. */
+.errorCampo {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 7px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: var(--fs-meta);
+  font-weight: 600;
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Error de acción: el rojo solo aparece aquí, nunca decorativo. */
+.alerta {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 7px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: var(--fs-body-sm);
+  font-weight: 600;
+}
+
+/*
+ * Advertencia, no error: lo que se ve sigue siendo válido, sólo puede estar un
+ * minuto atrasado. DESIGN.md reserva el rojo para error y destrucción.
+ */
+.aviso {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 7px;
+  background: var(--warn-bg);
+  color: var(--warn);
+  font-size: var(--fs-body-sm);
+  font-weight: 600;
+}
+
+.listado {
+  display: grid;
+  gap: 14px;
+}
+
+.listadoTitulo {
+  margin: 0;
+  font-size: var(--fs-body);
+  font-weight: 700;
+}
+
+.tarjeta {
+  display: grid;
+  gap: 10px;
+  padding: 20px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.tarjetaHeader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tarjetaTitulo {
+  margin: 0;
+  font-size: var(--fs-body);
+  font-weight: 700;
+}
+
+/*
+ * `pre-line`: los saltos de línea que escribió la persona son parte de lo que
+ * escribió, y el navegador no tiene por qué colapsarlos. `overflow-wrap` evita
+ * que una palabra larguísima ensanche la tarjeta.
+ */
+.descripcion {
+  margin: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.historial {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.historialTitulo {
+  margin: 0;
+  color: var(--muted);
+}
+
+.historialLista {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.asiento {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+}
+
+.transicion {
+  font-size: var(--fs-body-sm);
+  font-weight: 600;
+}

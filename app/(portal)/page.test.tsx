@@ -92,6 +92,37 @@ describe("/ (dashboard del colaborador)", () => {
     expect(screen.getByText("Ana Quispe")).toBeInTheDocument();
   });
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   *  LA PUERTA AL BUZÓN (ÍTEM #13)
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * El buzón es de acceso general — el PRD lo deja fuera del sistema de
+   * asignaciones — así que necesita una puerta que no dependa de que haya algo
+   * asignado. Esta es la pantalla a la que llega todo el mundo al iniciar sesión,
+   * incluidos quienes tienen el dashboard vacío, y por eso el enlace vive aquí:
+   * es el único sitio donde es seguro que se vea.
+   */
+  it("ofrece la entrada al buzón de sugerencias", async () => {
+    guardPage.mockResolvedValue({ allowed: true, usuario: USUARIO });
+
+    render(await PortalPage());
+
+    expect(screen.getByRole("link", { name: /buzón de sugerencias/i })).toHaveAttribute(
+      "href",
+      "/sugerencias",
+    );
+  });
+
+  it("mantiene el buzón a la vista aunque no haya nada asignado", async () => {
+    guardPage.mockResolvedValue({ allowed: true, usuario: USUARIO });
+    listarRecursosAsignados.mockResolvedValue([]);
+
+    render(await PortalPage());
+
+    expect(screen.getByRole("link", { name: /buzón de sugerencias/i })).toBeInTheDocument();
+  });
+
   it("mantiene el cambio de tema al alcance del colaborador", async () => {
     /* Hasta que exista una topbar propia, esta pantalla es el único sitio del
        portal donde se monta el toggle: quitarlo dejaría al producto sin forma
