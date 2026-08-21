@@ -213,6 +213,16 @@ them.
    was not in the file. The block's note was corrected with it — it still claimed these variables had
    no consumer, which stopped being true when item #10 shipped the proxy route.
 
+   A second, larger drift in the same file was fixed in the same pass: the Ítem #3 block named
+   `ENTRA_CLIENT_ID` / `ENTRA_CLIENT_SECRET` / `ENTRA_TENANT_ID` / `ENTRA_ISSUER` /
+   `ENTRA_REDIRECT_URI`, none of which any module reads, while `ALLOWED_EMAIL_DOMAIN` — the rule
+   that decides which domain may sign in — was not in the template at all, nor was `ADMIN_EMAIL`.
+   The names are now the ones Auth.js v5 auto-detects (`AUTH_MICROSOFT_ENTRA_ID_*`), the tenant id
+   lives inside the issuer URL where the provider expects it, and the redirect URI is documented as
+   what it actually is: a registration TI performs in Entra ID, not a variable this file sets. The
+   template is now consistent with every env reader in both directions — nothing required is
+   missing, nothing listed goes unread.
+
 3. **A link into the admin panel would make the mail far more useful, and it needs `AUTH_URL`.** The
    body tells the reader to go to the portal but cannot say where, because building an absolute URL
    means depending on a variable this item otherwise does not touch (`AUTH_URL`, reserved for item
