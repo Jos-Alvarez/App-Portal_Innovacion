@@ -211,10 +211,13 @@ transaction that was rolled back, so `sugerencia` was left empty and no temporar
 - [x] "El registro se confirma con toast." — `CONFIRMACION_ENVIO`, restarted per send.
 - [ ] "En operación normal, el Área de Innovación recibe el correo de aviso." — **item #14**, and
       deliberately not started here. The PRD makes the send best-effort precisely so the suggestion
-      does not depend on it.
+      does not depend on it. *(Delivered afterwards by item #14 — see
+      `openspec/specs/notificacion-correo-best-effort/README.md`.)*
 - [x] "Con la API de correo caída, la sugerencia queda registrada igualmente." — trivially true
       today, since nothing is sent. When #14 lands it must hook in *after* the insert has succeeded,
-      and the route's test pins that nothing calls `fetch` today.
+      and the route's test pins that nothing calls `fetch` today. *(It did, and the pin held: the
+      test now asserts no `fetch` happens inside the request, because the send is scheduled with
+      `after`.)*
 
 ---
 
