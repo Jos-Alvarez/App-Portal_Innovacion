@@ -104,3 +104,56 @@ export const crearSugerenciaSchema = z.object({
 });
 
 export type CrearSugerencia = z.infer<typeof crearSugerenciaSchema>;
+
+/**
+ * The widest value `sugerencia.id` can hold — SQL Server's `INT`.
+ *
+ * The same bound `lib/enlaces/schema.ts` states, for the same reason: without
+ * it, an id past 2³¹−1 reaches Prisma and comes back as a database error the
+ * reader cannot act on, instead of a 400 that says the link they followed is
+ * wrong.
+ */
+const ID_MAX = 2_147_483_647;
+
+/**
+ * A path parameter, parsed rather than coerced — item #15's routes address one
+ * suggestion by id.
+ *
+ * The regex is what makes `Number` safe here: `"12abc"` and `" 12"` are refused
+ * as text before any conversion happens, so nothing reaches Prisma as a `NaN` or
+ * as a surprising coercion.
+ */
+export const idSugerenciaSchema = z
+  .string()
+  .regex(/^\d+$/)
+  .transform(Number)
+  .pipe(z.number().int().positive().max(ID_MAX));
+
+/**
+ * The body of `PATCH /api/sugerencias/{id}/estado` — ADR 0003's route for the
+ * review funnel.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  ONE FIELD, AND EVERY OTHER KEY IS DROPPED
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * `estado` is the only thing an administrator changes about a suggestion. The
+ * title, the description and the destination area are what a collaborator WROTE:
+ * the portal is a record of their idea, not a draft the reviewer edits, and the
+ * PRD is explicit that the review is a state machine ("cambiar su estado
+ * pendiente → en revisión → aprobada/rechazada/implementada") and nothing more.
+ *
+ * zod strips unknown keys, so a body that also carries `titulo` or `autorId` is
+ * not refused — it is parsed down to the one field this endpoint accepts, and
+ * the repository writes the PARSED output. There is no path by which a request
+ * to this route rewrites somebody's words.
+ *
+ * `cambiadoPor` is deliberately absent too: who made the change comes from the
+ * session, never from the body. An immutable ledger whose author column can be
+ * filled in by the caller is not an audit trail.
+ */
+export const cambiarEstadoSchema = z.object({
+  estado: z.enum(ESTADOS_SUGERENCIA),
+});
+
+export type CambiarEstado = z.infer<typeof cambiarEstadoSchema>;

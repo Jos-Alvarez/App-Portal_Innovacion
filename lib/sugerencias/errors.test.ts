@@ -2,7 +2,18 @@
 import { describe, expect, it } from "vitest";
 
 import { crearSugerenciaSchema } from "./schema";
-import { autorNoEncontrado, ERROR_INTERNO, errorDePrisma, errorDeValidacion } from "./errors";
+import {
+  autorNoEncontrado,
+  ERROR_INTERNO,
+  ERROR_INTERNO_LISTADO,
+  ERROR_INTERNO_REVISION,
+  errorDePrisma,
+  errorDeTransicion,
+  errorDeValidacion,
+  estadoInvalido,
+  identificadorInvalido,
+  TransicionRechazada,
+} from "./errors";
 
 /**
  * The mapping from "something went wrong" to "a sentence the collaborator can
@@ -158,5 +169,133 @@ describe("errorDePrisma", () => {
     for (const mensaje of mensajes) {
       expect(mensaje).not.toMatch(/P\d{4}|fkey|sugerencia_|NVARCHAR|prisma/i);
     }
+  });
+});
+
+/**
+ * Las fallas de la revisión — ítem #15.
+ *
+ * Everything above is copy for a collaborator sending an idea. These are read by
+ * an administrator whose state change did not apply, and the difference is not
+ * cosmetic: telling a reviewer "no se guardó nada, vuelve a intentarlo" about a
+ * suggestion that is safely in the database is a sentence that describes the
+ * wrong event.
+ */
+describe("errorDeTransicion", () => {
+  it("responde 404 cuando la sugerencia ya no existe", () => {
+    const fallo = errorDeTransicion(new TransicionRechazada("no_encontrada"));
+
+    expect(fallo.status).toBe(404);
+    expect(fallo.error.codigo).toBe("sugerencia_no_encontrada");
+  });
+
+  /** Ya estaba en ese estado: el doble clic, o dos administradores de acuerdo. */
+  it("responde 409 cuando no hay cambio que registrar", () => {
+    const fallo = errorDeTransicion(new TransicionRechazada("sin_cambio"));
+
+    expect(fallo.status).toBe(409);
+    expect(fallo.error.codigo).toBe("estado_sin_cambio");
+  });
+
+  it("responde 409 cuando otra persona movió la fila primero", () => {
+    const fallo = errorDeTransicion(new TransicionRechazada("conflicto"));
+
+    expect(fallo.status).toBe(409);
+    expect(fallo.error.codigo).toBe("estado_en_conflicto");
+  });
+
+  /**
+   * El mensaje del conflicto tiene que decir qué hacer, porque la decisión que
+   * tomó quien lo recibe se tomó contra un estado que ya no existe.
+   */
+  it("le pide al segundo revisor que vuelva a mirar antes de decidir", () => {
+    const { mensaje } = errorDeTransicion(new TransicionRechazada("conflicto")).error;
+
+    expect(mensaje).toMatch(/actualiza/i);
+    expect(mensaje).toMatch(/otra persona/i);
+  });
+
+  it.each([
+    new Error("connection reset"),
+    { code: "P2002" },
+    { code: "P2003" },
+    undefined,
+    null,
+    "boom",
+  ])("responde el error interno de revisión ante %o", (error) => {
+    expect(errorDeTransicion(error)).toBe(ERROR_INTERNO_REVISION);
+  });
+
+  /**
+   * LA DIFERENCIA CON `ERROR_INTERNO` NO ES DE ESTILO.
+   *
+   * That one promises "no se guardó nada" about a suggestion that was never
+   * written. Here the suggestion exists and only the state change failed, so the
+   * promise has to be the other one: it stayed as it was.
+   */
+  it("no le dice al revisor que la sugerencia no se guardó", () => {
+    expect(ERROR_INTERNO_REVISION.error.mensaje).not.toMatch(/no se guardó/i);
+    expect(ERROR_INTERNO_REVISION.error.mensaje).toMatch(/quedó como estaba/i);
+    expect(ERROR_INTERNO_REVISION.status).toBe(500);
+  });
+
+  it("no reenvía nada que haya dicho Prisma ni la base", () => {
+    for (const motivo of ["no_encontrada", "sin_cambio", "conflicto"] as const) {
+      const { mensaje } = errorDeTransicion(new TransicionRechazada(motivo)).error;
+
+      expect(mensaje).not.toMatch(/prisma|zod|sql|constraint|P\d{4}/i);
+    }
+
+    expect(errorDeTransicion({ code: "P2003", meta: { field_name: "cambiado_por" } }).error.mensaje)
+      .not.toMatch(/cambiado_por|P2003/);
+  });
+});
+
+describe("estadoInvalido", () => {
+  it("es un 400 con su propio código", () => {
+    const fallo = estadoInvalido();
+
+    expect(fallo.status).toBe(400);
+    expect(fallo.error.codigo).toBe("estado_invalido");
+  });
+
+  /**
+   * Nadie llega acá desde la pantalla, donde los cinco estados son botones. El
+   * mensaje habla de elegir de la lista, no de corregir un campo que la persona
+   * nunca escribió.
+   */
+  it("no le pide al lector que corrija un campo que no tipeó", () => {
+    expect(estadoInvalido().error.mensaje).not.toMatch(/campo|carácter|caracteres/i);
+    expect(estadoInvalido().error.mensaje).toMatch(/estado/i);
+  });
+});
+
+describe("identificadorInvalido", () => {
+  it("es un 400 que manda de vuelta a la lista", () => {
+    const fallo = identificadorInvalido();
+
+    expect(fallo.status).toBe(400);
+    expect(fallo.error.codigo).toBe("identificador_invalido");
+    expect(fallo.error.mensaje).toMatch(/lista/i);
+  });
+});
+
+describe("ERROR_INTERNO_LISTADO", () => {
+  /** No se estaba escribiendo nada, así que prometer que "no se guardó nada" contesta otra pregunta. */
+  it("no promete nada sobre lo guardado, porque no había escritura", () => {
+    expect(ERROR_INTERNO_LISTADO.status).toBe(500);
+    expect(ERROR_INTERNO_LISTADO.error.mensaje).not.toMatch(/guard/i);
+    expect(ERROR_INTERNO_LISTADO.error.mensaje).toMatch(/cargar/i);
+  });
+});
+
+describe("TransicionRechazada", () => {
+  /** Es un `Error` de verdad: eso es lo que hace que `$transaction` revierta. */
+  it("es un Error, que es lo que revierte la transacción", () => {
+    const rechazo = new TransicionRechazada("conflicto");
+
+    expect(rechazo).toBeInstanceOf(Error);
+    expect(rechazo.motivo).toBe("conflicto");
+    expect(rechazo.name).toBe("TransicionRechazada");
   });
 });

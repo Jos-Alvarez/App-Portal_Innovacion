@@ -3,10 +3,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   AREA_DESTINO_MAX,
+  cambiarEstadoSchema,
   crearSugerenciaSchema,
   DESCRIPCION_MAX,
   ESTADO_INICIAL,
   ESTADOS_SUGERENCIA,
+  idSugerenciaSchema,
   TITULO_MAX,
 } from "./schema";
 
@@ -165,5 +167,117 @@ describe("crearSugerenciaSchema", () => {
 
     expect(resultado.success).toBe(false);
     expect(resultado.error?.issues[0]?.path).toEqual(["areaDestino"]);
+  });
+});
+
+/**
+ * El identificador de la ruta — item #15 addresses one suggestion by id.
+ *
+ * What matters here is what is refused BEFORE any conversion: a value that is
+ * not digits must never reach Prisma as a `NaN`.
+ */
+describe("idSugerenciaSchema", () => {
+  it("acepta un id decimal y lo entrega como número", () => {
+    const resultado = idSugerenciaSchema.safeParse("31");
+
+    expect(resultado.success).toBe(true);
+    expect(resultado.data).toBe(31);
+  });
+
+  it.each(["", " ", "abc", "12abc", " 12", "12 ", "1.5", "-3", "0x1f", "1e3"])(
+    "rechaza %o antes de convertirlo",
+    (crudo) => {
+      expect(idSugerenciaSchema.safeParse(crudo).success).toBe(false);
+    },
+  );
+
+  /** Cero no es un id: la columna es IDENTITY y arranca en 1. */
+  it("rechaza el cero", () => {
+    expect(idSugerenciaSchema.safeParse("0").success).toBe(false);
+  });
+
+  it("acepta el mayor INT de SQL Server y rechaza el siguiente", () => {
+    expect(idSugerenciaSchema.safeParse("2147483647").success).toBe(true);
+    expect(idSugerenciaSchema.safeParse("2147483648").success).toBe(false);
+  });
+
+  /**
+   * The static `/todas` route sits beside this dynamic one. Next resolves the
+   * literal path first, but if that ever changed, the schema is the second line
+   * of defence and it refuses the word outright.
+   */
+  it("rechaza «todas», que es la ruta hermana y no un id", () => {
+    expect(idSugerenciaSchema.safeParse("todas").success).toBe(false);
+  });
+});
+
+/**
+ * El cuerpo del cambio de estado.
+ *
+ * The whole endpoint is one field, so these tests are mostly about what the
+ * schema DROPS: the words a collaborator wrote, and the identity of whoever
+ * signs the asiento.
+ */
+describe("cambiarEstadoSchema", () => {
+  it.each(ESTADOS_SUGERENCIA)("acepta el estado %s", (estado) => {
+    const resultado = cambiarEstadoSchema.safeParse({ estado });
+
+    expect(resultado.success).toBe(true);
+    expect(resultado.data).toEqual({ estado });
+  });
+
+  it("acepta exactamente el vocabulario del CHECK de la base, ni uno más", () => {
+    /* `archivada` suena razonable y no existe: la restricción
+       `sugerencia_estado_check` sólo enumera cinco valores. */
+    for (const invalido of ["archivada", "PENDIENTE", "en revision", "en-revision", ""]) {
+      expect(cambiarEstadoSchema.safeParse({ estado: invalido }).success).toBe(false);
+    }
+  });
+
+  it.each([undefined, null, 42, [], "pendiente"])("rechaza el cuerpo %o", (cuerpo) => {
+    expect(cambiarEstadoSchema.safeParse(cuerpo).success).toBe(false);
+  });
+
+  it("rechaza un cuerpo sin estado", () => {
+    expect(cambiarEstadoSchema.safeParse({}).success).toBe(false);
+  });
+
+  /**
+   * LO QUE ESTE ENDPOINT NO PUEDE REESCRIBIR.
+   *
+   * The title, the description and the destination area are what a collaborator
+   * WROTE. They are dropped rather than refused — zod strips unknown keys — and
+   * the repository writes the parsed output, so there is no path by which a
+   * request to this route edits somebody's words.
+   */
+  it("descarta el título, la descripción y el área que traiga el cuerpo", () => {
+    const resultado = cambiarEstadoSchema.safeParse({
+      estado: "aprobada",
+      titulo: "Otro título",
+      descripcion: "Otro texto",
+      areaDestino: "Otra área",
+    });
+
+    expect(resultado.success).toBe(true);
+    expect(resultado.data).toEqual({ estado: "aprobada" });
+  });
+
+  /** Quién firma el asiento sale de la sesión, nunca del cuerpo. */
+  it("descarta cambiadoPor, autorId, id y grupoId", () => {
+    const resultado = cambiarEstadoSchema.safeParse({
+      estado: "rechazada",
+      cambiadoPor: 1,
+      autorId: 1,
+      id: 99,
+      grupoId: 4,
+    });
+
+    expect(resultado.success).toBe(true);
+    expect(resultado.data).toEqual({ estado: "rechazada" });
+  });
+
+  /** El embudo no se valida acá: el repositorio explica por qué no se valida en ningún lado. */
+  it("acepta una transición hacia atrás, porque el orden del embudo no es una regla", () => {
+    expect(cambiarEstadoSchema.safeParse({ estado: "pendiente" }).success).toBe(true);
   });
 });

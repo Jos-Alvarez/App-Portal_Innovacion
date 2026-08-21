@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 
+import { TransicionRechazada } from "@/lib/sugerencias/errors";
 import {
   type CrearSugerencia,
   ESTADO_INICIAL,
@@ -296,4 +297,242 @@ export async function leerAreaDelAutor(
   /* No row means the account went away between the guard and this read. The
      form still works; it just opens with nothing filled in. */
   return fila?.area ?? "";
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+ *  ÍTEM #15 — LA GESTIÓN
+ *
+ * Everything above answers one collaborator about their own suggestions.
+ * Everything below answers the Área de Innovación about all of them, and moves
+ * them through the funnel. The two are kept apart on purpose — see the note on
+ * `listarSugerenciasDeAutor`.
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * The slice of Prisma the administration screen writes through.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  `$transaction` ARRIVED WITH A REASON, AND IT IS A NEW TYPE FOR IT
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * `crearSugerencia` argued against adding `$transaction` to `SugerenciasClient`:
+ * a nested create is already atomic and there was no third statement to justify
+ * the cost. `cambiarEstadoSugerencia` IS that third statement — it reads a state,
+ * writes the row conditionally on it, and then writes the ledger entry that
+ * quotes it — so the interactive transaction has finally earned its place.
+ *
+ * It is a SEPARATE type rather than a widened `SugerenciasClient` so that every
+ * existing test double of the collaborator box stays valid. Adding a member to
+ * the shared slice would have made the compiler demand a `$transaction` stub from
+ * suites that never open one.
+ *
+ * `historialSugerencia` is here because the asiento is now written on its own
+ * rather than nested under the row it belongs to: `updateMany` — the conditional
+ * write below — has no nested-write form.
+ */
+export type SugerenciasAdminClient = Pick<
+  PrismaClient,
+  "sugerencia" | "historialSugerencia" | "$transaction"
+>;
+
+/**
+ * One suggestion as the Área de Innovación reads it: everything the author sees,
+ * plus who wrote it.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  A SEPARATE DTO, NOT A WIDENED `SugerenciaDTO`
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * The author name and area are exactly the fields the collaborator endpoint must
+ * never grow: `GET /api/sugerencias` answers about you, so it has no reason to
+ * name anyone. Making `autor` optional on the shared DTO would put that
+ * distinction in an `undefined` check instead of in the type, and the day a
+ * screen forgets the check the mistake renders rather than failing to compile.
+ *
+ * `area` is here and not only `nombre` because it is what the Área de Innovación
+ * actually triages by — an idea from Peajes and an idea from Sistemas go to
+ * different people. Note that it is the AUTHOR area, which is not the same field
+ * as `areaDestino`: the PRD lets someone write a suggestion for another area
+ * entirely, and item #19 reports on both ("sugerencias por estado y área").
+ *
+ * `correo` is deliberately NOT selected. The Área de Innovación already receives
+ * the notification mail of item #14 with the author address in it, and a
+ * management screen that lists every collaborator corporate e-mail is a copy of
+ * the directory that nothing on this screen needs.
+ */
+export interface SugerenciaAdminDTO extends SugerenciaDTO {
+  autor: { nombre: string; area: string };
+}
+
+/** `SELECT_DTO` plus the author. */
+const SELECT_ADMIN = {
+  ...SELECT_DTO,
+  autor: { select: { nombre: true, area: true } },
+} as const;
+
+interface FilaSugerenciaAdmin extends FilaSugerencia {
+  autor: { nombre: string; area: string };
+}
+
+function toAdminDTO(fila: FilaSugerenciaAdmin): SugerenciaAdminDTO {
+  return { ...toDTO(fila), autor: { nombre: fila.autor.nombre, area: fila.autor.area } };
+}
+
+/**
+ * Every suggestion the portal holds, newest first — "el listado completo" of
+ * item #15.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  THIS IS THE SEPARATE READ `listarSugerenciasDeAutor` ASKED FOR
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * That function comment named the one way item #13 could be broken from outside:
+ * "Item #15 needs the complete list for an administrator; it must add a SEPARATE,
+ * admin-guarded read rather than making this one filter conditional." This is
+ * that read. It takes no author, it has no `where`, and it is called from exactly
+ * two places — a route behind `guardRouteAdmin` and a page behind
+ * `guardPageAdmin`.
+ *
+ * The two functions cannot be confused for one another by a future refactor: one
+ * requires an author and cannot be widened, the other accepts none and cannot be
+ * narrowed. The authorization is in which name you typed.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  NO PAGINATION, AND THAT IS A DECISION WITH A LIFESPAN
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * A suggestions box for one company staff grows by a handful of rows a week, and
+ * the screen filters by state in the browser over the list it already holds —
+ * which is only honest while the whole list fits in one answer. The moment this
+ * table is in the thousands, the filter has to move to the server and this read
+ * has to take a cursor. It is written down here rather than guessed at now
+ * because paginating a list nobody has yet would cost the item #16 grouping
+ * screen a shape it does not need either.
+ */
+export async function listarSugerencias(
+  client: Pick<PrismaClient, "sugerencia">,
+): Promise<SugerenciaAdminDTO[]> {
+  const filas = await client.sugerencia.findMany({
+    select: SELECT_ADMIN,
+    orderBy: [{ fechaCreacion: "desc" }, { id: "desc" }],
+  });
+
+  return (filas as FilaSugerenciaAdmin[]).map(toAdminDTO);
+}
+
+/**
+ * Moves one suggestion through the funnel and writes the asiento that records
+ * the move.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  THE ROW AND THE ASIENTO ARE ONE TRANSACTION, NOT TWO WRITES
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * TECH-DESIGN.md asks that "cada cambio de estado escribe un asiento inmutable
+ * en historial_sugerencia … y ningún estado anterior se pierde al avanzar el
+ * embudo". Two separate writes break that promise in both directions: a crash
+ * between them leaves either a state nobody can account for, or an asiento for a
+ * change that did not happen. Inside `$transaction` there is no "between them".
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  THE UPDATE IS CONDITIONAL ON THE STATE THAT WAS READ
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * `updateMany` with `where: { id, estado: actual }` is optimistic concurrency,
+ * and it is what makes `estado_anterior` TRUE rather than merely plausible. Two
+ * administrators reviewing the same suggestion in the same seconds both read
+ * `pendiente`; without the condition, both updates succeed and both write an
+ * asiento claiming the row was `pendiente` when they changed it — so the ledger
+ * would show `pendiente → aprobada` followed by `pendiente → rechazada`, a trail
+ * that is internally impossible and, worse, silently wrong about the first
+ * decision. With the condition the second update matches zero rows, the whole
+ * transaction rolls back, and the second reviewer is told to look again.
+ *
+ * `updateMany` and not `update` because only the `many` form takes a non-unique
+ * `where` and reports how many rows it matched. It matches at most one: `id` is
+ * the primary key.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  A TRANSITION TO THE SAME STATE IS REFUSED, ON PURPOSE
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * `aprobada → aprobada` is not a transition; it is a double click, or two
+ * administrators agreeing. Writing it would put non-events into a ledger whose
+ * whole value is that every row in it is a change somebody made — and the trail
+ * the author reads on their own screen would fill with lines saying that nothing
+ * happened, twice. The row is untouched and the caller gets a 409.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  THE FUNNEL ORDER IS *NOT* ENFORCED, AND THAT IS DELIBERATE
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * TECH-DESIGN.md describes the path as "pendiente → en revisión →
+ * aprobada/rechazada/implementada", and it would be easy to read that as a graph
+ * to police. It is a description of the normal case, and no document asks for the
+ * other moves to be impossible.
+ *
+ * Refusing them would cost more than it buys. An administrator who clicks
+ * "Rechazada" instead of "Aprobada" needs to correct it, and with a one-way graph
+ * the only correction left is a database edit — outside the portal, outside the
+ * ledger, and therefore outside the accountability the PRD asks for. A rejected
+ * idea revived months later is a real thing that happens, and an approved idea
+ * that turns out to be unworkable has to be able to go back.
+ *
+ * What the product actually asked for is that nothing is LOST, and that is what
+ * the asiento gives: every move — forward, back or sideways — is recorded with
+ * who made it and when. Accountability, not a locked door. The vocabulary stays
+ * closed either way: `cambiarEstadoSchema` and the `sugerencia_estado_check`
+ * constraint both refuse anything that is not one of the five states.
+ *
+ * `cambiadoPor` is the administrator from the session. It is a parameter and not
+ * a field of any body — see `cambiarEstadoSchema`.
+ */
+export async function cambiarEstadoSugerencia(
+  client: SugerenciasAdminClient,
+  id: number,
+  estadoNuevo: EstadoSugerencia,
+  cambiadoPor: number,
+): Promise<SugerenciaAdminDTO> {
+  return client.$transaction(async (tx) => {
+    const actual = await tx.sugerencia.findUnique({ where: { id }, select: { estado: true } });
+
+    if (actual === null) {
+      throw new TransicionRechazada("no_encontrada");
+    }
+
+    if (actual.estado === estadoNuevo) {
+      throw new TransicionRechazada("sin_cambio");
+    }
+
+    const { count } = await tx.sugerencia.updateMany({
+      where: { id, estado: actual.estado },
+      data: { estado: estadoNuevo },
+    });
+
+    /* Somebody else moved it between the read and the write. Throwing is what
+       rolls the transaction back — see the note on `TransicionRechazada`. */
+    if (count !== 1) {
+      throw new TransicionRechazada("conflicto");
+    }
+
+    await tx.historialSugerencia.create({
+      data: { sugerenciaId: id, estadoAnterior: actual.estado, estadoNuevo, cambiadoPor },
+    });
+
+    /*
+     * Read back inside the transaction rather than assembling the answer from
+     * what was just written: the response carries the FULL ledger, including the
+     * asiento above with the `fecha_cambio` the database chose, and the author
+     * this screen lists by. Building it by hand would mean inventing a timestamp
+     * in TypeScript that the row does not have.
+     */
+    const fila = await tx.sugerencia.findUnique({ where: { id }, select: SELECT_ADMIN });
+
+    /* Unreachable: the update above matched this row inside this transaction. */
+    if (fila === null) {
+      throw new TransicionRechazada("no_encontrada");
+    }
+
+    return toAdminDTO(fila as FilaSugerenciaAdmin);
+  });
 }

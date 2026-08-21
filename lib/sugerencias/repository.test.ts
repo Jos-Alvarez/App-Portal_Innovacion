@@ -1,8 +1,16 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
 
-import type { SugerenciasClient } from "./repository";
-import { crearSugerencia, leerAreaDelAutor, listarSugerenciasDeAutor } from "./repository";
+import { TransicionRechazada } from "./errors";
+import type { SugerenciasAdminClient, SugerenciasClient } from "./repository";
+import {
+  cambiarEstadoSugerencia,
+  crearSugerencia,
+  leerAreaDelAutor,
+  listarSugerencias,
+  listarSugerenciasDeAutor,
+} from "./repository";
+import { ESTADOS_SUGERENCIA } from "./schema";
 
 /**
  * The reads and the write the suggestions box performs.
@@ -271,5 +279,344 @@ describe("leerAreaDelAutor", () => {
     const { client } = clientDouble(FILA, null);
 
     expect(await leerAreaDelAutor(client, 12)).toBe("");
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+ *  ÍTEM #15 — LA GESTIÓN
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+const REVISADA = new Date("2026-08-22T09:15:00.000Z");
+
+/** La misma fila de arriba, con el autor que sólo el panel del admin lee. */
+const FILA_ADMIN = {
+  ...FILA,
+  autor: { nombre: "Ana Quispe", area: "Operaciones" },
+};
+
+/**
+ * El doble del cliente administrativo.
+ *
+ * `$transaction` ejecuta el callback en el acto y deja pasar lo que tire: eso es
+ * exactamente lo que hace la transacción interactiva real, y es lo que permite
+ * comprobar que un rechazo se propaga en vez de convertirse en una escritura a
+ * medias.
+ */
+function adminDouble({
+  estadoActual = "pendiente" as string | null,
+  count = 1,
+  fila = FILA_ADMIN as unknown,
+}: {
+  estadoActual?: string | null;
+  count?: number;
+  fila?: unknown;
+} = {}) {
+  const findMany = vi.fn(async (_args?: unknown) => [FILA_ADMIN]);
+
+  /* Primera llamada: el estado actual. Segunda: la fila completa de vuelta. */
+  const findUnique = vi
+    .fn()
+    .mockImplementationOnce(async (_args: unknown) =>
+      estadoActual === null ? null : { estado: estadoActual },
+    )
+    .mockImplementation(async (_args: unknown) => fila);
+
+  const updateMany = vi.fn(async (_args: unknown) => ({ count }));
+  const crearAsiento = vi.fn(async (_args: unknown) => ({ id: 91 }));
+  const transaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
+    fn({
+      sugerencia: { findUnique, updateMany, findMany },
+      historialSugerencia: { create: crearAsiento },
+    }),
+  );
+
+  const client = {
+    sugerencia: { findMany, findUnique, updateMany },
+    historialSugerencia: { create: crearAsiento },
+    $transaction: transaction,
+  } as unknown as SugerenciasAdminClient;
+
+  return { client, findMany, findUnique, updateMany, crearAsiento, transaction };
+}
+
+describe("listarSugerencias", () => {
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   *  LA LECTURA SEPARADA QUE PIDIÓ EL ÍTEM #13
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * `listarSugerenciasDeAutor` dejó escrito que el ítem #15 tenía que agregar
+   * una lectura PROPIA y con guard de admin, en vez de volver condicional su
+   * filtro. Esta prueba fija esa forma: no hay `where`, y no hay parámetro por
+   * el que colarle un autor.
+   */
+  it("no lleva `where`: la autorización está en el guard de la ruta, no acá", async () => {
+    const { client, findMany } = adminDouble();
+
+    await listarSugerencias(client);
+
+    expect(findMany.mock.calls[0]?.[0]).not.toHaveProperty("where");
+  });
+
+  it("devuelve las más nuevas primero, con el id como desempate estable", async () => {
+    const { client, findMany } = adminDouble();
+
+    await listarSugerencias(client);
+
+    expect(findMany.mock.calls[0]?.[0]).toMatchObject({
+      orderBy: [{ fechaCreacion: "desc" }, { id: "desc" }],
+    });
+  });
+
+  /** El área del autor es por lo que tría el Área de Innovación. */
+  it("trae el nombre y el área del autor", async () => {
+    const { client } = adminDouble();
+
+    const [sugerencia] = await listarSugerencias(client);
+
+    expect(sugerencia.autor).toEqual({ nombre: "Ana Quispe", area: "Operaciones" });
+  });
+
+  /**
+   * El correo corporativo no se selecciona: el aviso del ítem #14 ya se lo lleva
+   * al Área de Innovación, y una pantalla de gestión que liste la dirección de
+   * cada colaborador es una copia del directorio que nadie acá necesita.
+   */
+  it("no selecciona el correo del autor", async () => {
+    const { client, findMany } = adminDouble();
+
+    await listarSugerencias(client);
+
+    const select = (findMany.mock.calls[0]?.[0] as { select: Record<string, unknown> }).select;
+    const autor = select.autor as { select: Record<string, unknown> };
+
+    expect(autor.select).toEqual({ nombre: true, area: true });
+    expect(select).not.toHaveProperty("autorId");
+    expect(select).not.toHaveProperty("grupoId");
+  });
+
+  /** Lo mismo que promete `SugerenciaDTO`: ningún `Date` cruza hacia el navegador. */
+  it("no deja escapar ningún Date", async () => {
+    const { client } = adminDouble();
+
+    const [sugerencia] = await listarSugerencias(client);
+
+    expect(typeof sugerencia.fechaCreacion).toBe("string");
+    expect(sugerencia.fechaCreacion).toBe(CREADA.toISOString());
+    expect(typeof sugerencia.historial[0]?.fechaCambio).toBe("string");
+  });
+
+  it("trae el historial completo, del más viejo al más nuevo", async () => {
+    const { client, findMany } = adminDouble();
+
+    await listarSugerencias(client);
+
+    const select = (findMany.mock.calls[0]?.[0] as { select: { historial: unknown } }).select;
+
+    expect(select.historial).toMatchObject({ orderBy: { id: "asc" } });
+  });
+});
+
+describe("cambiarEstadoSugerencia", () => {
+  it("escribe la fila y el asiento dentro de una sola transacción", async () => {
+    const { client, transaction, updateMany, crearAsiento } = adminDouble();
+
+    await cambiarEstadoSugerencia(client, 31, "en_revision", 3);
+
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(updateMany).toHaveBeenCalledTimes(1);
+    expect(crearAsiento).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   *  EL UPDATE VA CONDICIONADO AL ESTADO QUE SE LEYÓ
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Eso es lo que hace que `estado_anterior` sea VERDADERO y no apenas
+   * verosímil. Sin la condición, dos administradores que leen `pendiente` a la
+   * vez escriben los dos su asiento diciendo que la fila estaba en `pendiente`
+   * cuando la cambiaron.
+   */
+  it("condiciona el update al estado leído, no sólo al id", async () => {
+    const { client, updateMany } = adminDouble({ estadoActual: "pendiente" });
+
+    await cambiarEstadoSugerencia(client, 31, "aprobada", 3);
+
+    expect(updateMany.mock.calls[0]?.[0]).toEqual({
+      where: { id: 31, estado: "pendiente" },
+      data: { estado: "aprobada" },
+    });
+  });
+
+  it("firma el asiento con los dos extremos de la transición y con quien la hizo", async () => {
+    const { client, crearAsiento } = adminDouble({ estadoActual: "en_revision" });
+
+    await cambiarEstadoSugerencia(client, 31, "implementada", 3);
+
+    expect(crearAsiento.mock.calls[0]?.[0]).toEqual({
+      data: {
+        sugerenciaId: 31,
+        estadoAnterior: "en_revision",
+        estadoNuevo: "implementada",
+        cambiadoPor: 3,
+      },
+    });
+  });
+
+  /** La fecha del asiento la elige la base (`@default(now())`), nunca TypeScript. */
+  it("no inventa una fecha de cambio", async () => {
+    const { client, crearAsiento } = adminDouble();
+
+    await cambiarEstadoSugerencia(client, 31, "aprobada", 3);
+
+    expect(crearAsiento.mock.calls[0]?.[0]).not.toMatchObject({
+      data: { fechaCambio: expect.anything() },
+    });
+  });
+
+  it("responde la fila releída con su historial y su autor", async () => {
+    const { client } = adminDouble({
+      fila: {
+        ...FILA_ADMIN,
+        estado: "aprobada",
+        historial: [
+          ...FILA_ADMIN.historial,
+          {
+            id: 91,
+            estadoAnterior: "pendiente",
+            estadoNuevo: "aprobada",
+            fechaCambio: REVISADA,
+            autor: { nombre: "Rosa Díaz" },
+          },
+        ],
+      },
+    });
+
+    const sugerencia = await cambiarEstadoSugerencia(client, 31, "aprobada", 3);
+
+    expect(sugerencia.estado).toBe("aprobada");
+    expect(sugerencia.autor).toEqual({ nombre: "Ana Quispe", area: "Operaciones" });
+    expect(sugerencia.historial).toHaveLength(2);
+    expect(sugerencia.historial[1]).toEqual({
+      id: 91,
+      estadoAnterior: "pendiente",
+      estadoNuevo: "aprobada",
+      fechaCambio: REVISADA.toISOString(),
+      autor: "Rosa Díaz",
+    });
+  });
+
+  it("relee la fila DENTRO de la transacción, después de escribir el asiento", async () => {
+    const { client, findUnique, crearAsiento } = adminDouble();
+
+    await cambiarEstadoSugerencia(client, 31, "aprobada", 3);
+
+    expect(findUnique).toHaveBeenCalledTimes(2);
+    expect(crearAsiento.mock.invocationCallOrder[0]).toBeLessThan(
+      findUnique.mock.invocationCallOrder[1],
+    );
+  });
+
+  /* ── Los tres rechazos ─────────────────────────────────────────────────── */
+
+  it("rechaza con «no_encontrada» si la fila ya no está, sin escribir nada", async () => {
+    const { client, updateMany, crearAsiento } = adminDouble({ estadoActual: null });
+
+    await expect(cambiarEstadoSugerencia(client, 31, "aprobada", 3)).rejects.toMatchObject({
+      motivo: "no_encontrada",
+    });
+
+    expect(updateMany).not.toHaveBeenCalled();
+    expect(crearAsiento).not.toHaveBeenCalled();
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   *  UNA TRANSICIÓN AL MISMO ESTADO NO ES UNA TRANSICIÓN
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Es un doble clic, o dos administradores de acuerdo. Escribirla metería
+   * no-eventos en un libro cuyo valor entero es que cada fila sea un cambio que
+   * alguien hizo — y la traza que lee el autor en su pantalla se llenaría de
+   * líneas que dicen que no pasó nada, dos veces.
+   */
+  it("rechaza con «sin_cambio» el doble clic, y no toca la fila", async () => {
+    const { client, updateMany, crearAsiento } = adminDouble({ estadoActual: "aprobada" });
+
+    await expect(cambiarEstadoSugerencia(client, 31, "aprobada", 3)).rejects.toMatchObject({
+      motivo: "sin_cambio",
+    });
+
+    expect(updateMany).not.toHaveBeenCalled();
+    expect(crearAsiento).not.toHaveBeenCalled();
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   *  LA CARRERA ENTRE DOS REVISORES
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * `count: 0` es lo que devuelve el `updateMany` condicionado cuando alguien
+   * movió la fila entre la lectura y la escritura. Tirar es lo que revierte: si
+   * en vez de eso siguiera adelante, quedaría un asiento describiendo una
+   * transición que nunca ocurrió.
+   */
+  it("rechaza con «conflicto» si otro revisor movió la fila primero, y no escribe el asiento", async () => {
+    const { client, crearAsiento } = adminDouble({ count: 0 });
+
+    await expect(cambiarEstadoSugerencia(client, 31, "rechazada", 3)).rejects.toMatchObject({
+      motivo: "conflicto",
+    });
+
+    expect(crearAsiento).not.toHaveBeenCalled();
+  });
+
+  it("es un TransicionRechazada, que es lo que hace revertir a `$transaction`", async () => {
+    const { client } = adminDouble({ count: 0 });
+
+    await expect(cambiarEstadoSugerencia(client, 31, "rechazada", 3)).rejects.toBeInstanceOf(
+      TransicionRechazada,
+    );
+  });
+
+  /* ── El embudo ────────────────────────────────────────────────────────── */
+
+  /**
+   * EL ORDEN DEL EMBUDO NO SE POLICÍA, Y ES DELIBERADO.
+   *
+   * TECH-DESIGN.md describe el camino normal; ningún documento pide que los
+   * demás movimientos sean imposibles. Prohibirlos dejaría a quien se equivocó
+   * de botón sin corrección dentro del portal — es decir, fuera del libro y
+   * fuera de la rendición de cuentas que pide el PRD. Lo que sí se garantiza es
+   * que nada se pierde: cada movimiento queda asentado con su autor y su fecha.
+   */
+  it("deja volver atrás desde «implementada», y lo asienta", async () => {
+    const { client, crearAsiento } = adminDouble({ estadoActual: "implementada" });
+
+    await cambiarEstadoSugerencia(client, 31, "en_revision", 3);
+
+    expect(crearAsiento.mock.calls[0]?.[0]).toMatchObject({
+      data: { estadoAnterior: "implementada", estadoNuevo: "en_revision" },
+    });
+  });
+
+  it("deja saltarse «en_revision», que es el camino normal apurado", async () => {
+    const { client, updateMany } = adminDouble({ estadoActual: "pendiente" });
+
+    await cambiarEstadoSugerencia(client, 31, "implementada", 3);
+
+    expect(updateMany).toHaveBeenCalledTimes(1);
+  });
+
+  /** El vocabulario sí es cerrado, y lo cierran el schema y el CHECK de la base. */
+  it("nunca escribe un estado que no venga del vocabulario", async () => {
+    const { client, updateMany } = adminDouble();
+
+    await cambiarEstadoSugerencia(client, 31, "rechazada", 3);
+
+    const { data } = updateMany.mock.calls[0]?.[0] as { data: { estado: string } };
+
+    expect(ESTADOS_SUGERENCIA).toContain(data.estado);
   });
 });

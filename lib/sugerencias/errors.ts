@@ -148,3 +148,147 @@ function codigoPrisma(error: unknown): string | null {
 export function errorDePrisma(error: unknown): ApiFailure {
   return codigoPrisma(error) === "P2003" ? autorNoEncontrado() : ERROR_INTERNO;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+ *  ÍTEM #15 — LA REVISIÓN
+ *
+ * Everything above is written for a collaborator sending an idea. Everything
+ * below is read by an administrator moving one through the funnel, and the copy
+ * changes accordingly: they are not being told their suggestion was not saved,
+ * they are being told a state change did not apply and why.
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/** Why a state change could not be applied — the three cases worth telling apart. */
+export type MotivoTransicion = "no_encontrada" | "sin_cambio" | "conflicto";
+
+/**
+ * A refused transition, thrown by the repository and mapped by the route.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  WHY AN EXCEPTION AND NOT A RESULT TYPE
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * These three cases are decided INSIDE an interactive transaction, and throwing
+ * is what rolls it back. A result type would leave the caller holding a "no" with
+ * the transaction still open and the row already updated on two of the three
+ * paths — so the mechanism that reports the refusal has to be the same one that
+ * undoes the work, or the refusal is a lie.
+ *
+ * `motivo` is a closed union rather than a message, so the mapping to a status
+ * code and a Spanish sentence stays in this module with every other one.
+ */
+export class TransicionRechazada extends Error {
+  constructor(readonly motivo: MotivoTransicion) {
+    super(`Transición rechazada: ${motivo}`);
+    this.name = "TransicionRechazada";
+  }
+}
+
+/**
+ * The failing end of `PATCH /api/sugerencias/{id}/estado`, one sentence per
+ * reason.
+ *
+ * `no_encontrada` is a 404 and the other two are 409, and the split is the usual
+ * one: 404 says the thing you addressed is not there, 409 says it is there and
+ * the state of the world is not what your request assumed.
+ *
+ * `sin_cambio` is the double click, and answering it is not pedantry — see
+ * `cambiarEstadoSugerencia`, where refusing it is what keeps the immutable ledger
+ * a record of changes rather than of button presses.
+ *
+ * `conflicto` is the one that would otherwise be invisible: two administrators
+ * reviewing the same suggestion in the same seconds. The message names the fix
+ * (reload and look at where it actually is now) because the second reviewer's
+ * decision was made against a state that no longer exists.
+ */
+const MENSAJES_TRANSICION: Record<MotivoTransicion, ApiFailure> = {
+  no_encontrada: apiFailure(
+    404,
+    "sugerencia_no_encontrada",
+    "Esa sugerencia ya no existe. Actualiza la lista para ver las que siguen vigentes.",
+  ),
+  sin_cambio: apiFailure(
+    409,
+    "estado_sin_cambio",
+    "La sugerencia ya está en ese estado, así que no registramos ningún cambio.",
+  ),
+  conflicto: apiFailure(
+    409,
+    "estado_en_conflicto",
+    "Otra persona cambió el estado de esta sugerencia mientras la revisabas. Actualiza la lista y vuelve a decidir sobre el estado actual.",
+  ),
+};
+
+/**
+ * The one answer to everything unrecognised while reviewing.
+ *
+ * Separate from `ERROR_INTERNO` because that one says "no pudimos registrar tu
+ * sugerencia … no se guardó nada", which would be actively misleading here: the
+ * suggestion exists, it is the state change that did not apply. Same incuriosity
+ * about the cause, different fact being reported.
+ */
+export const ERROR_INTERNO_REVISION: ApiFailure = apiFailure(
+  500,
+  "error_interno",
+  "No pudimos cambiar el estado de la sugerencia. Quedó como estaba; vuelve a intentarlo en un momento.",
+);
+
+/** A path parameter that is not an id at all. */
+export function identificadorInvalido(): ApiFailure {
+  return apiFailure(
+    400,
+    "identificador_invalido",
+    "No reconocimos esa sugerencia. Vuelve a la lista y elígela de nuevo.",
+  );
+}
+
+/**
+ * A failed transition, as the administrator sees it.
+ *
+ * The typed refusals get their own sentence; anything else — a dropped
+ * connection, a CHECK violation, a deadlock — is the internal error. There is
+ * deliberately no P2003 branch on `cambiado_por`: an administrator whose own row
+ * vanished mid-request is a session problem, not something a sentence about
+ * suggestions can help with, and the guard re-reads that row on the next request
+ * anyway.
+ */
+export function errorDeTransicion(error: unknown): ApiFailure {
+  return error instanceof TransicionRechazada
+    ? MENSAJES_TRANSICION[error.motivo]
+    : ERROR_INTERNO_REVISION;
+}
+
+/**
+ * The admin list could not be read.
+ *
+ * Its own sentence for the same reason `ERROR_INTERNO_REVISION` has one: nothing
+ * was being written, so promising that "no se guardó nada" would answer a
+ * question nobody asked.
+ */
+export const ERROR_INTERNO_LISTADO: ApiFailure = apiFailure(
+  500,
+  "error_interno",
+  "No pudimos cargar las sugerencias. Vuelve a intentarlo en un momento.",
+);
+
+/**
+ * A rejected body on `PATCH /api/sugerencias/{id}/estado`.
+ *
+ * It takes no `ZodError` and branches on nothing, unlike `errorDeValidacion`
+ * above — and that is a property of the schema rather than a shortcut.
+ * `cambiarEstadoSchema` has exactly one field, so "missing", "not a string" and
+ * "not one of the five states" are all the same sentence: the state you sent is
+ * not a state. Threading the issue through only to arrive at one message would
+ * suggest there were others to arrive at.
+ *
+ * A person cannot produce this from the screen, where the five states are
+ * buttons. It answers a hand-made request, so the copy says what the endpoint
+ * accepts instead of asking the reader to fix a field they never typed.
+ */
+export function estadoInvalido(): ApiFailure {
+  return apiFailure(
+    400,
+    "estado_invalido",
+    "Ese no es un estado válido para una sugerencia. Elige uno de la lista y vuelve a intentarlo.",
+  );
+}
