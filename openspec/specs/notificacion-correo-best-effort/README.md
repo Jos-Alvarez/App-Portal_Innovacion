@@ -206,10 +206,12 @@ them.
    are the change — and if the provider needs a different auth header or a per-recipient field, this
    is the file, and it is the only one.
 
-2. **`.env.example` names `PROCESADORES_SERVICE_BASE_URL`; the code reads `PROCESADORES_BASE_URL`.**
-   Found while adding the mail variables, and deliberately **not** fixed here — it belongs to item
-   #10's surface, not this one. It is a real trap: someone copying the template will set a variable
-   nothing reads and get a throw naming a variable that is not in the file.
+2. ~~**`.env.example` names `PROCESADORES_SERVICE_BASE_URL`; the code reads
+   `PROCESADORES_BASE_URL`.**~~ **Fixed.** Found while adding the mail variables and initially left
+   alone as item #10's surface, then corrected on request in the same cycle. It was a real trap:
+   someone copying the template set a variable nothing reads and got a throw naming a variable that
+   was not in the file. The block's note was corrected with it — it still claimed these variables had
+   no consumer, which stopped being true when item #10 shipped the proxy route.
 
 3. **A link into the admin panel would make the mail far more useful, and it needs `AUTH_URL`.** The
    body tells the reader to go to the portal but cannot say where, because building an absolute URL
