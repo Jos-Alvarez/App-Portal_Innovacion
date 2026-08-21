@@ -43,5 +43,10 @@ Desktop.ini
 .idea/
 *.swp
 
+# Cache de herramientas locales. Se regenera sola y describe la maquina de
+# quien la genero, no el proyecto: versionarla solo produce conflictos que no
+# significan nada.
+.atl/
+
 # Nota: `prisma/migrations/` NO se ignora — el historial de migraciones se
 # versiona.
