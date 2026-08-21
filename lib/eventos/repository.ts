@@ -39,12 +39,34 @@ export type EventosClient = Pick<PrismaClient, "eventoUso">;
 
 /**
  * The `evento_uso.tipo_evento` vocabulary, identical to the enum-shaped values
- * documented on the column in `prisma/schema.prisma`.
+ * documented on the column in `prisma/schema.prisma` and to the CHECK
+ * constraint the migrations enforce. `lib/prisma-schema.test.ts` compares the
+ * schema against the migrations; `lib/procesadores/ejecucion-errores.test.ts`
+ * compares this list against what the execution proxy actually writes.
  *
- * Only `apertura` has a writer today. The other four belong to the execution
- * proxy of item #10 — one success and the three typed errors the FastAPI
- * service reports — and are declared here so that item adds a caller and not a
- * second vocabulary.
+ * ══════════════════════════════════════════════════════════════════════════
+ *  THE FIVE `error_*` MEMBERS MIRROR THE SERVICE ONE FOR ONE
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * The processing service defines exactly five typed errors — `formato`,
+ * `tamano`, `contenido`, `cantidad`, `clave_inexistente` — and this list now
+ * has a member for each. That is a property worth keeping, not a coincidence:
+ * a total mapping is what stops the execution proxy from ever having to decide
+ * what to do with an error it cannot name.
+ *
+ * IT WAS NOT ALWAYS TOTAL, AND THE GAP WAS EXPENSIVE. The list originally
+ * carried only the three errors ADR 0006 happens to name in passing, so
+ * `cantidad` and `clave_inexistente` arrived with nowhere to go. Recording
+ * nothing looked like the safe option and was not: a procesador whose
+ * `clave_procesador` matches no module in the registry produces no events at
+ * all, which reads in item #19 exactly like a procesador nobody wants — and an
+ * administrator acting on that would retire the very resource people were
+ * failing to use. See the migration
+ * `20260821143000_evento_uso_errores_tipificados_completos`.
+ *
+ * A sixth typed error in the service therefore needs a member here, a CHECK
+ * widened in a new migration, and a branch in `EVENTO_POR_TIPO` — in that
+ * order, and none of them optional.
  */
 export const TIPOS_EVENTO = [
   "apertura",
@@ -52,6 +74,8 @@ export const TIPOS_EVENTO = [
   "error_formato",
   "error_tamano",
   "error_contenido",
+  "error_cantidad",
+  "error_clave_inexistente",
 ] as const;
 
 export type TipoEvento = (typeof TIPOS_EVENTO)[number];

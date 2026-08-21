@@ -220,7 +220,21 @@ model EventoUso {
   /// Id of the referenced `enlace` or `procesador` row. No foreign key.
   idRecurso   Int      @map("id_recurso")
   /// Enum-shaped: "apertura" | "ejecucion" | "error_formato" |
-  /// "error_tamano" | "error_contenido".
+  /// "error_tamano" | "error_contenido" | "error_cantidad" |
+  /// "error_clave_inexistente".
+  ///
+  /// One member per outcome the portal can observe, and the five `error_*`
+  /// ones are a deliberate one-to-one mirror of the processing service's five
+  /// typed errors (ADR 0014 of the `procesadores` repository: `formato`,
+  /// `tamano`, `contenido`, `cantidad`, `clave_inexistente`).
+  ///
+  /// THE MIRROR IS THE POINT. The vocabulary originally carried only the three
+  /// errors ADR 0006 happened to name, which left the portal receiving two
+  /// typed errors it had nowhere to put. Both alternatives were bad: filing
+  /// them under a neighbouring member reports a problem that never happened,
+  /// and recording nothing makes a broken procesador indistinguishable from an
+  /// unused one — so an administrator reading item #19 would retire the very
+  /// resource people were failing to use. A total mapping removes the choice.
   tipoEvento  String   @map("tipo_evento") @db.NVarChar(30)
   /// Default not specified by ADR 0002.
   fecha       DateTime @default(now()) @db.DateTime2
