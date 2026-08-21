@@ -1,0 +1,299 @@
+import type { PrismaClient } from "@prisma/client";
+
+import {
+  type CrearSugerencia,
+  ESTADO_INICIAL,
+  type EstadoSugerencia,
+} from "@/lib/sugerencias/schema";
+
+/**
+ * The database reads and writes the suggestions box performs.
+ *
+ * The Prisma client is a parameter and not a module import, exactly as in every
+ * other repository here: production passes the singleton, the suite passes a
+ * double and never reaches SQL Server.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  DATES LEAVE THIS MODULE AS STRINGS, AND THAT IS NOT A DETAIL
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * Prisma hands back `Date` objects. If the DTO carried them, this screen would
+ * hold the same value in two different types depending on how it arrived: the
+ * Server Component's props keep a `Date` across the RSC boundary, while the
+ * very same list fetched by SWR arrives as JSON and is a `string`. The
+ * component would then be right on the first paint and wrong on the first
+ * revalidation — a `toLocaleDateString is not a function` that appears a minute
+ * after the page loads and never in a test that renders it once.
+ *
+ * Converting here removes the possibility instead of documenting it. The DTO is
+ * what crosses to the browser, so the DTO is where the wire format is decided,
+ * and ISO 8601 is the format that survives `JSON.stringify` unambiguously.
+ * Turning it into something a person reads is the UI's job.
+ */
+
+/**
+ * The slice of Prisma these functions use.
+ *
+ * `usuario` is in it for exactly one column — see `leerAreaDelAutor` at the
+ * bottom. It is NOT in `lib/usuarios/repository.ts` because that module opens by
+ * declaring what it is ("the database reads the assignment SCREENS perform over
+ * `usuario`", neither of them exposed as an endpoint), and a read that prefills
+ * a collaborator's form is neither of those things. It is a read the suggestions
+ * box performs, so it lives with the suggestions box.
+ */
+export type SugerenciasClient = Pick<PrismaClient, "sugerencia" | "usuario">;
+
+/**
+ * One entry of the ledger — a state transition, as `historial_sugerencia`
+ * records it and as the author reads it.
+ *
+ * `estadoAnterior` is `null` on exactly one entry: the one this item writes
+ * when the suggestion is created, because there was no previous state. Every
+ * later entry (item #15) carries both ends of the transition.
+ *
+ * `autor` is a NAME and not an id. ADR 0002 asks the ledger to record "quién lo
+ * hizo y cuándo", and the trail is shown to the person who wrote the
+ * suggestion: an id would tell them nothing, and the e-mail of the
+ * administrator who reviewed it is more than they need to see.
+ */
+export interface AsientoSugerencia {
+  id: number;
+  estadoAnterior: EstadoSugerencia | null;
+  estadoNuevo: EstadoSugerencia;
+  /** ISO 8601, UTC. See the note at the top of this module. */
+  fechaCambio: string;
+  autor: string;
+}
+
+/**
+ * One suggestion as the API hands it to its author.
+ *
+ * `estado` is narrowed to the vocabulary here, and it is the one claim this
+ * module makes that the database cannot make in the type system: Prisma has no
+ * enums on SQL Server, so the column is a plain string. Two guarantees hold it
+ * up — the `sugerencia_estado_check` constraint refuses any other value at the
+ * database, and no code path writes anything but `ESTADO_INICIAL`. Widening it
+ * to `string` would push the same uncertainty onto every chip that renders it.
+ *
+ * `grupoId` is deliberately absent. It exists on the row and belongs to item
+ * #16; grouping is something the Área de Innovación does for its own
+ * convenience, and the PRD is explicit that collaborators neither comment on
+ * nor vote on suggestions — so the author has no use for the bucket their idea
+ * was filed into, and the API does not send it.
+ */
+export interface SugerenciaDTO {
+  id: number;
+  titulo: string;
+  descripcion: string;
+  areaDestino: string;
+  estado: EstadoSugerencia;
+  /** ISO 8601, UTC. See the note at the top of this module. */
+  fechaCreacion: string;
+  /** The full trail, oldest first: the "trazabilidad visible" of item #13. */
+  historial: AsientoSugerencia[];
+}
+
+/**
+ * The columns of `SugerenciaDTO`, as Prisma's `select`.
+ *
+ * Narrow on purpose, like every other repository here: a column added to
+ * `sugerencia` later does not silently start travelling to every browser. Note
+ * what is NOT selected — `autorId` and `grupoId` — even though the reader is
+ * the author and already knows who they are.
+ *
+ * The ledger is ordered OLDEST FIRST because it is read as a story: the entry
+ * that says the suggestion was sent belongs at the top, and the current state
+ * at the bottom. It is ordered by `id` and not by `fechaCambio` because two
+ * transitions can share a timestamp — `DATETIME2` is precise, but nothing stops
+ * an item #15 batch from writing two entries in the same instant — and an
+ * autoincrement id cannot tie.
+ */
+const SELECT_DTO = {
+  id: true,
+  titulo: true,
+  descripcion: true,
+  areaDestino: true,
+  estado: true,
+  fechaCreacion: true,
+  historial: {
+    select: {
+      id: true,
+      estadoAnterior: true,
+      estadoNuevo: true,
+      fechaCambio: true,
+      autor: { select: { nombre: true } },
+    },
+    orderBy: { id: "asc" },
+  },
+} as const;
+
+/** The row shape `SELECT_DTO` produces, before the narrowing and the dates. */
+interface FilaSugerencia {
+  id: number;
+  titulo: string;
+  descripcion: string;
+  areaDestino: string;
+  estado: string;
+  fechaCreacion: Date;
+  historial: {
+    id: number;
+    estadoAnterior: string | null;
+    estadoNuevo: string;
+    fechaCambio: Date;
+    autor: { nombre: string };
+  }[];
+}
+
+function toDTO(fila: FilaSugerencia): SugerenciaDTO {
+  return {
+    id: fila.id,
+    titulo: fila.titulo,
+    descripcion: fila.descripcion,
+    areaDestino: fila.areaDestino,
+    estado: fila.estado as EstadoSugerencia,
+    fechaCreacion: fila.fechaCreacion.toISOString(),
+    historial: fila.historial.map((asiento) => ({
+      id: asiento.id,
+      estadoAnterior: asiento.estadoAnterior as EstadoSugerencia | null,
+      estadoNuevo: asiento.estadoNuevo as EstadoSugerencia,
+      fechaCambio: asiento.fechaCambio.toISOString(),
+      autor: asiento.autor.nombre,
+    })),
+  };
+}
+
+/**
+ * Registers a suggestion and opens its ledger, in one write.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  WHY THE LEDGER ENTRY IS CREATED HERE AND NOT LEFT TO ITEM #15
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * `historial_sugerencia.estado_anterior` is nullable, and `prisma/schema.prisma`
+ * says what the nullability is for: "NULL for the entry row of a suggestion that
+ * has no previous state". That row can only be written at creation.
+ *
+ * Without it, the trail of a brand-new suggestion is EMPTY, and the backlog asks
+ * this item for "listado propio con trazabilidad visible" — a trail that starts
+ * only once an administrator touches the suggestion is not visible traceability,
+ * it is a gap that happens to close later. It would also make `fecha_creacion`
+ * and the ledger tell the same story in two different shapes, which is the split
+ * ADR 0002 wrote the ledger to avoid.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  ONE NESTED WRITE, NOT TWO CALLS IN A TRANSACTION
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * Prisma runs a nested create inside an implicit transaction, so the row and its
+ * first ledger entry either both exist or neither does. Doing it as two calls
+ * wrapped in `$transaction` would buy the same atomicity, cost the repository's
+ * client slice a `$transaction` member, and force every test double to implement
+ * one. There is no third statement here that would justify that.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  `estado` IS WRITTEN EXPLICITLY, THOUGH THE COLUMN HAS A DEFAULT
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * This is the opposite of what `crearEnlace` does with `activo`, and the
+ * difference is the invariant. There, the default is the only writer of a flag
+ * nothing else mirrors. Here, the row's `estado` and its first ledger entry must
+ * say the same thing — so taking one from the database's default and the other
+ * from a constant in TypeScript would create two sources for one fact, and the
+ * day they disagree, the trail contradicts the chip above it. Both come from
+ * `ESTADO_INICIAL`.
+ *
+ * The author signs their own entry (`cambiadoPor: autorId`): they are the one
+ * who moved the suggestion into `pendiente` by sending it.
+ */
+export async function crearSugerencia(
+  client: SugerenciasClient,
+  autorId: number,
+  datos: CrearSugerencia,
+): Promise<SugerenciaDTO> {
+  const fila = await client.sugerencia.create({
+    data: {
+      autorId,
+      titulo: datos.titulo,
+      descripcion: datos.descripcion,
+      areaDestino: datos.areaDestino,
+      estado: ESTADO_INICIAL,
+      historial: { create: { estadoNuevo: ESTADO_INICIAL, cambiadoPor: autorId } },
+    },
+    select: SELECT_DTO,
+  });
+
+  return toDTO(fila as FilaSugerencia);
+}
+
+/**
+ * Everything this collaborator has sent, newest first.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  THE `where` IS THE AUTHORIZATION, AND IT IS NOT OPTIONAL
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * `autorId` is a required parameter with no default and no "all" escape hatch,
+ * so there is no way to call this function and accidentally read somebody else's
+ * suggestions. Item #15 needs the complete list for an administrator; it must
+ * add a SEPARATE, admin-guarded read rather than making this one's filter
+ * conditional. A read whose scope widens depending on who is asking is one
+ * refactor away from widening for the wrong caller, and the failure is silent —
+ * a collaborator's screen quietly filling with other people's ideas.
+ *
+ * Newest first because the list is a record of what you sent, and the thing you
+ * sent last is the thing you are most likely to be checking on. Ties break on
+ * `id`, descending with the date, so two suggestions sent in the same instant
+ * still come back in a stable order rather than whatever the engine chose that
+ * day.
+ */
+export async function listarSugerenciasDeAutor(
+  client: SugerenciasClient,
+  autorId: number,
+): Promise<SugerenciaDTO[]> {
+  const filas = await client.sugerencia.findMany({
+    where: { autorId },
+    select: SELECT_DTO,
+    orderBy: [{ fechaCreacion: "desc" }, { id: "desc" }],
+  });
+
+  return (filas as FilaSugerencia[]).map(toDTO);
+}
+
+/**
+ * The author's own area, as Entra ID last reported it — the form's default
+ * destination.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  WHY A PREFILL IS WORTH A QUERY
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * The PRD lets someone write a suggestion "para sí mismo, su área u otra área",
+ * and the first two of those three are their own area. `area_destino` is free
+ * text — it has to be, since an area with no registered user yet is still a
+ * legal destination — so without a default the common case is someone typing
+ * their own department from memory. That is where item #19's grouping goes to
+ * die: "Peajes", "peajes" and "Área de Peajes" are three bars in a chart that
+ * should have one.
+ *
+ * Prefilling does not fix the drift, and this item does not claim to. It just
+ * removes the most frequent chance to introduce it, at the cost of one column
+ * on a screen that is already querying.
+ *
+ * The empty string is a real answer and not a missing one: `usuario.area`
+ * defaults to `""` for a person whose Entra ID profile reports no department,
+ * and `prisma/schema.prisma` is explicit that this is the "no area reported"
+ * bucket rather than a NULL. The form treats it as "no default" and asks.
+ */
+export async function leerAreaDelAutor(
+  client: SugerenciasClient,
+  autorId: number,
+): Promise<string> {
+  const fila = await client.usuario.findUnique({
+    where: { id: autorId },
+    select: { area: true },
+  });
+
+  /* No row means the account went away between the guard and this read. The
+     form still works; it just opens with nothing filled in. */
+  return fila?.area ?? "";
+}
