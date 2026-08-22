@@ -203,12 +203,10 @@ belonging to the wrong resource — the failure mode nothing on screen would rev
 
 Deliberately out of scope, and none of them is a gap in the acceptance criteria:
 
-- **No link to this screen from the topbar.** The bar currently holds one admin door
-  (`/admin/administradores`) and the other five admin screens — enlaces, procesadores, asignaciones,
-  sugerencias and now analítica — are reached by URL. Adding an entry for *this* one only would make
-  the panel's navigation more arbitrary, not less. `components/topbar/topbar.tsx` already records
-  when to act: "if the bar ever grows a set of entries rather than one, that is the moment to add
-  `aria-current`". Admin navigation is worth one small item of its own, covering all six at once.
+- ~~**No link to this screen from the topbar.**~~ **Done — see Follow-up below.** It was left out of
+  this item because adding an entry for *this* screen alone would have made the panel's navigation
+  more arbitrary, not less; it was worth one small change covering all six at once, and that change
+  has since been made.
 - **No export.** Nobody asked for CSV or PDF, and the numbers on screen are the report.
 - **No cap on the length of a custom range**, matching item #18's decision and ADR 0010's acceptance
   of live aggregation. The date fields refuse a future day and an inverted range; nothing else.
@@ -218,3 +216,63 @@ Deliberately out of scope, and none of them is a gap in the acceptance criteria:
 - **The database host's time zone is still the assumption** stated in `lib/analitica/periodos.ts`.
   Item #18 flagged it as worth confirming with TI *before the analytics screen is shown to anybody* —
   that screen now exists, so the confirmation is due.
+
+---
+
+## Follow-up (same day)
+
+Two adjustments were made immediately after this item closed. They are recorded here rather than in
+a spec of their own because both are consequences of item #19 rather than new scope.
+
+### 1. The `revalidateOnMount` fix reached the other three screens
+
+The defect this item found is not specific to analytics: **four** screens share the "Server Component
+pre-reads, client component takes it as `fallbackData`" shape, and all four were re-fetching on
+mount. The setting and the whole argument now live in `lib/swr-pre-lectura.ts`, and the dashboard,
+the collaborator's inbox and the administrator's inbox import it by name at their own call sites —
+not through an `<SWRConfig>` provider, which `app/(portal)/sugerencias/sugerencias-client.ts` refuses
+for reasons that still hold.
+
+`app/(portal)/mis-recursos-client.ts` had documented the opposite as deliberate: `revalidateIfStale`
+was listed as a default kept on purpose, "what makes the mount after hydration re-ask". That
+paragraph was rewritten rather than deleted — the mechanism it described was right, the trade was
+not: it bought a correction the interval and the focus revalidation already provide, at the price of
+a redundant read on every page load.
+
+What is given up is stated in the module: SWR's cache outlives a screen and wins over `fallbackData`,
+so a reader returning to the dashboard after ten minutes sees the cached list until the interval
+fires. That is a change in LATENCY and not in what is shown — the same stale cached list rendered
+first before the change too — and the interval is the freshness these screens already promise.
+
+Thirteen existing tests asserted the old behaviour, directly or by relying on the mount fetch to
+trigger their scenario. They now trigger the revalidation through the focus event, which is the half
+of ADR 0007's policy that actually models a reader coming back, and the test wrappers set
+`focusThrottleInterval: 0` so a test does not have to wait SWR's five real seconds.
+
+### 2. The topbar now holds all six admin screens
+
+`components/topbar/admin-nav.tsx` renders the six entries with `aria-current="page"` on the one being
+read — exactly the trigger item #17 wrote down: "if the bar ever grows a set of entries rather than
+one, that is the moment to add `aria-current`."
+
+It is a client component so it can read `usePathname` itself. `topbar.tsx` had weighed a prop when
+there was one entry and rejected it; with six entries and nine call sites the objection is stronger,
+since a page naming the wrong route would highlight a screen the reader is not on. Matching is by
+prefix so `/admin/asignaciones/7` still marks Asignaciones, and the prefixes are disjoint — a test
+asserts no path can match two entries.
+
+**The PRD's placement survives.** It asks for the Administradores entry "junto al de cerrar
+sesión"; the nav sits immediately before the sign-out button and Administradores is its last entry,
+so that line still holds. The order of `ENLACES_ADMIN` is therefore load-bearing, and a test asserts
+it — an alphabetical sort would break a PRD requirement in silence.
+
+### Verification of the follow-up
+
+| Check | Result |
+|---|---|
+| `pnpm test` | 128 files, 2033 tests, all passing (2009 before; 24 added), run three consecutive times |
+| `pnpm typecheck` / `pnpm lint` / `pnpm build` | clean |
+
+Mutations, applied and reverted: flipping `SIN_REVALIDACION_AL_MONTAR` back to `true` failed 10 tests
+across five files, and loosening the nav's prefix match to a bare `startsWith` failed the test that
+proves `/admin/enlaces-viejos` must not light up Enlaces.

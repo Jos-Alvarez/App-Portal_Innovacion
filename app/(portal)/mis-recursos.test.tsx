@@ -55,7 +55,19 @@ const PROCESADOR: RecursoAsignado = {
  */
 function montar(recursosIniciales: readonly RecursoAsignado[]): ReactNode {
   return (
-    <SWRConfig value={{ provider: () => new Map() }}>
+    <SWRConfig
+      value={{
+        provider: () => new Map(),
+        /*
+         * Sin estrangulador de foco. En producción SWR admite una revalidación
+         * por foco cada 5 s contados desde el montaje, lo que en una prueba
+         * significaría esperar 5 s reales para provocar la única revalidación
+         * que estas pruebas necesitan — la que hasta el ítem #19 ocurría sola al
+         * montar. El intervalo estrangulado no es lo que se está probando acá.
+         */
+        focusThrottleInterval: 0,
+      }}
+    >
       <MisRecursos recursosIniciales={recursosIniciales} />
     </SWRConfig>
   );
@@ -221,6 +233,22 @@ describe("MisRecursos", () => {
     });
   });
 
+  /**
+   * Dispara la revalidación por foco.
+   *
+   * Hasta el ítem #19 estas pruebas no necesitaban disparar nada: SWR consultaba
+   * sola al montar, incluso con `fallbackData`, y esa consulta redundante es el
+   * defecto que `lib/swr-pre-lectura.ts` corrige. Ahora el foco es el disparador
+   * más cercano a la realidad: es la mitad de la política del ADR 0007 que
+   * atiende al lector que vuelve a la pestaña.
+   *
+   * SWR limita el foco a uno cada `focusThrottleInterval` (5 s), así que dos
+   * revalidaciones seguidas necesitan avanzar el reloj entre medio.
+   */
+  function revalidarPorFoco() {
+    window.dispatchEvent(new Event("focus"));
+  }
+
   describe("la revalidación de SWR", () => {
     it("pinta la lista del servidor sin esperar a la primera petición", () => {
       /* The fetcher never resolves in this test: whatever is on screen came from
@@ -231,10 +259,21 @@ describe("MisRecursos", () => {
       expect(screen.queryByRole("status")).not.toBeInTheDocument();
     });
 
-    it("vuelve a preguntar al montar, sin esperar al intervalo", async () => {
+    /*
+     * Lo contrario de lo que esta prueba afirmaba hasta el ítem #19, y el cambio
+     * es deliberado: `app/(portal)/page.tsx` leyó estas filas en ESTE request y
+     * se las pasó al componente. Volver a pedirlas al montar era un viaje de ida
+     * y vuelta por página cargada para redibujar lo que ya estaba en el HTML.
+     */
+    it("no vuelve a preguntar al montar: el servidor ya leyó esta lista", async () => {
       render(montar([APP]));
 
-      await waitFor(() => expect(obtenerMisRecursos).toHaveBeenCalledWith("/api/mis-recursos"));
+      /* Después de vaciar las colas: la consulta del montaje cae en un microtask
+         posterior, así que una aserción síncrona pasaría por casualidad. */
+      await new Promise((listo) => setTimeout(listo, 0));
+
+      expect(obtenerMisRecursos).not.toHaveBeenCalled();
+      expect(screen.getByText("Portal de Compras")).toBeInTheDocument();
     });
 
     it("quita de la pantalla un recurso que el servidor ya no devuelve", async () => {
@@ -243,6 +282,8 @@ describe("MisRecursos", () => {
       render(montar([APP, AGENTE]));
 
       expect(screen.getByText("Asistente de Contratos")).toBeInTheDocument();
+
+      revalidarPorFoco();
 
       await waitFor(() =>
         expect(screen.queryByText("Asistente de Contratos")).not.toBeInTheDocument(),
@@ -254,6 +295,7 @@ describe("MisRecursos", () => {
       obtenerMisRecursos.mockResolvedValue([APP, PROCESADOR]);
 
       render(montar([APP]));
+      revalidarPorFoco();
 
       await waitFor(() => expect(screen.getByText("Maestro de Excel")).toBeInTheDocument());
     });
@@ -262,6 +304,7 @@ describe("MisRecursos", () => {
       obtenerMisRecursos.mockResolvedValue([]);
 
       render(montar([APP]));
+      revalidarPorFoco();
 
       await waitFor(() =>
         expect(
@@ -274,6 +317,7 @@ describe("MisRecursos", () => {
       obtenerMisRecursos.mockRejectedValue(new Error("500"));
 
       render(montar([APP, PROCESADOR]));
+      revalidarPorFoco();
 
       await waitFor(() => expect(screen.getByText(AVISO_SIN_ACTUALIZAR)).toBeInTheDocument());
 
@@ -290,6 +334,7 @@ describe("MisRecursos", () => {
       obtenerMisRecursos.mockResolvedValue([APP]);
 
       render(montar([APP]));
+      revalidarPorFoco();
 
       await waitFor(() => expect(obtenerMisRecursos).toHaveBeenCalled());
       expect(screen.queryByText(AVISO_SIN_ACTUALIZAR)).not.toBeInTheDocument();
@@ -299,6 +344,7 @@ describe("MisRecursos", () => {
       obtenerMisRecursos.mockRejectedValue(new Error("500"));
 
       render(montar([APP]));
+      revalidarPorFoco();
 
       await waitFor(() => expect(screen.getByText(AVISO_SIN_ACTUALIZAR)).toBeInTheDocument());
       expect(screen.getByRole("status")).toHaveTextContent(AVISO_SIN_ACTUALIZAR);
@@ -308,14 +354,15 @@ describe("MisRecursos", () => {
       obtenerMisRecursos.mockRejectedValueOnce(new Error("500")).mockResolvedValue([APP, AGENTE]);
 
       render(montar([APP]));
+      revalidarPorFoco();
 
-      /* Con temporizadores reales, para que el fallo del montaje sea lo único
-         que ocurra: el reintento con backoff de SWR queda a segundos de aquí. */
+      /* Con temporizadores reales, para que el primer fallo sea lo único que
+         ocurra: el reintento con backoff de SWR queda a segundos de aquí. */
       await waitFor(() => expect(screen.getByText(AVISO_SIN_ACTUALIZAR)).toBeInTheDocument());
 
       vi.useFakeTimers();
       await vi.advanceTimersByTimeAsync(5_001);
-      window.dispatchEvent(new Event("focus"));
+      revalidarPorFoco();
 
       await vi.waitFor(() => expect(screen.getByText("Asistente de Contratos")).toBeInTheDocument());
       expect(screen.queryByText(AVISO_SIN_ACTUALIZAR)).not.toBeInTheDocument();
@@ -325,20 +372,19 @@ describe("MisRecursos", () => {
       /* El caso que ADR 0007 realmente cubre: el colaborador dejó la pestaña
          abierta, se fue a una reunión y volvió. `revalidateOnFocus` es la mitad
          de la política que atiende ese momento. */
-      vi.useFakeTimers();
-      obtenerMisRecursos.mockResolvedValueOnce([APP]).mockResolvedValue([APP, AGENTE]);
+      obtenerMisRecursos.mockResolvedValue([APP, AGENTE]);
 
       render(montar([APP]));
 
-      await vi.waitFor(() => expect(obtenerMisRecursos).toHaveBeenCalledTimes(1));
+      /* Ya no hay consulta de montaje: la del foco es la primera de todas, que
+         es exactamente el momento que el ADR 0007 describe. Con temporizadores
+         reales, porque el intervalo de 60 s no participa de este caso. */
+      expect(obtenerMisRecursos).not.toHaveBeenCalled();
 
-      /* SWR limita las revalidaciones por foco a una cada `focusThrottleInterval`
-         (5 s por defecto), contadas desde el montaje. Un intervalo de 60 s no
-         llega a dispararse aquí, así que lo que se observa es el foco. */
-      await vi.advanceTimersByTimeAsync(5_001);
-      window.dispatchEvent(new Event("focus"));
+      revalidarPorFoco();
 
-      await vi.waitFor(() => expect(screen.getByText("Asistente de Contratos")).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByText("Asistente de Contratos")).toBeInTheDocument());
+      expect(obtenerMisRecursos).toHaveBeenCalledTimes(1);
     });
 
     it("vuelve a preguntar sola al cabo de un minuto, sin que nadie toque nada", async () => {
@@ -347,11 +393,12 @@ describe("MisRecursos", () => {
 
       render(montar([APP]));
 
-      await vi.waitFor(() => expect(obtenerMisRecursos).toHaveBeenCalledTimes(1));
+      /* Cero al montar: el intervalo es ahora el primero que pregunta algo. */
+      expect(obtenerMisRecursos).not.toHaveBeenCalled();
 
       await vi.advanceTimersByTimeAsync(60_000);
 
-      await vi.waitFor(() => expect(obtenerMisRecursos).toHaveBeenCalledTimes(2));
+      await vi.waitFor(() => expect(obtenerMisRecursos).toHaveBeenCalledTimes(1));
     });
   });
 });

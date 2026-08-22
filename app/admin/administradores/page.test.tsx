@@ -5,7 +5,11 @@ const guardPageAdmin = vi.fn();
 const listarAdministradores = vi.fn();
 
 /* La mitad cliente pide el router al montarse; la navegación no es de lo que va este archivo. */
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+/* La topbar dibuja la navegacion del panel, que lee la ruta actual. */
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+  usePathname: () => "/admin/administradores",
+}));
 
 vi.mock("@/lib/authz", () => ({ guardPageAdmin: () => guardPageAdmin() }));
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));

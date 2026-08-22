@@ -2,6 +2,7 @@ import type { SWRConfiguration } from "swr";
 
 import type { Rango } from "@/lib/analitica/periodos";
 import type { RespuestaAnalitica } from "@/lib/analitica/servicio";
+import { SIN_REVALIDACION_AL_MONTAR } from "@/lib/swr-pre-lectura";
 
 /**
  * The browser's side of `GET /api/analitica`: how a question becomes a URL, how
@@ -180,19 +181,16 @@ export function opcionesDe(
     refreshInterval: periodoEnCurso(consulta, hoy) ? INTERVALO_MS : 0,
     revalidateOnFocus: true,
     /*
-     * DO NOT RE-ASK FOR THE PERIOD THE SERVER JUST ANSWERED.
-     *
-     * SWR revalidates on mount by default, `fallbackData` included — so without
-     * this line every single load of the screen would fire `GET /api/analitica`
-     * for `rango=hoy` immediately, spending three `GROUP BY`s over `evento_uso`
-     * to redraw numbers that are already in the HTML and are at most one request
-     * old. The Server Component read them for this very request.
+     * DO NOT RE-ASK FOR THE PERIOD THE SERVER JUST ANSWERED — three `GROUP BY`s
+     * over `evento_uso` to redraw numbers already in the HTML. This screen is
+     * where the cost was large enough to notice; `lib/swr-pre-lectura.ts` carries
+     * the argument for all four screens that share the pre-read shape.
      *
      * It only affects the mount. Changing the period fetches the new key as
      * usual, and coming back to a period already in the cache still revalidates
      * it, because by then it really can be stale.
      */
-    revalidateOnMount: false,
+    ...SIN_REVALIDACION_AL_MONTAR,
     /*
      * Keep the previous period's numbers on screen while the next one loads.
      * Without it, every chip blanks the whole dashboard for the length of a round

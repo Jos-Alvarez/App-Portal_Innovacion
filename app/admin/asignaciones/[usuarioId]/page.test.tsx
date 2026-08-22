@@ -7,7 +7,11 @@ const listarEnlaces = vi.fn();
 const listarProcesadores = vi.fn();
 
 /* The page renders the client screen, which asks for the router on mount. */
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+/* La topbar dibuja la navegacion del panel, que lee la ruta actual. */
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+  usePathname: () => "/admin/asignaciones/7",
+}));
 
 vi.mock("@/lib/authz", () => ({ guardPageAdmin: () => guardPageAdmin() }));
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));

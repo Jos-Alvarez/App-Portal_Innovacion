@@ -63,3 +63,51 @@
   align-items: center;
   margin-left: auto;
 }
+
+/*
+ * La navegación del panel: seis entradas, solo para administradores.
+ *
+ * Toma prestado el idioma visual del chip de filtro de DESIGN.md — "activo =
+ * navy relleno, inactivo = borde + --muted" — porque responde la misma pregunta
+ * que un chip: cuál de este conjunto está seleccionado. Reusar el tratamiento
+ * evita inventar un tercer lenguaje para "dónde estoy" en una interfaz que ya
+ * tiene uno.
+ *
+ * Envuelve por su cuenta: en una pantalla angosta las seis entradas bajan de
+ * línea en vez de empujar el nombre fuera de la barra.
+ */
+.adminNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.adminLink {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--muted);
+  font-size: var(--fs-body-sm);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.adminLink:hover:not([data-actual="true"]) {
+  border-color: var(--cyan);
+  color: var(--navy-fg);
+}
+
+/* La pantalla que se está leyendo. `aria-current` lo dice; esto lo muestra. */
+.adminLink[data-actual="true"] {
+  border-color: transparent;
+  background: var(--navy);
+  color: var(--on-primary);
+}
+
+.adminLink:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}

@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { LOGO_SIZE_TOPBAR, Logo } from "@/components/logo/logo";
 import { ThemeToggle } from "@/components/theme-toggle/theme-toggle";
+import { AdminNav } from "@/components/topbar/admin-nav";
 import { SignOutButton } from "@/components/topbar/sign-out-button";
 
 import styles from "./topbar.module.css";
@@ -48,14 +49,20 @@ import styles from "./topbar.module.css";
  * written once: the repetition is the mechanism, not an oversight.
  *
  * ══════════════════════════════════════════════════════════════════════════
- *  ON /admin/administradores THE DOOR POINTS AT THE PAGE YOU ARE ON
+ *  THE ONE DOOR BECAME SIX, AND WITH THEM `aria-current`
  * ══════════════════════════════════════════════════════════════════════════
  *
- * Left as it is, deliberately. Every navigation bar in the world behaves this
- * way, a reader loses nothing by following it, and the alternative — telling the
- * bar which route is current — means a prop every page has to pass correctly for
- * a wart nobody has ever complained about. If the bar ever grows a set of
- * entries rather than one, that is the moment to add `aria-current`.
+ * Item #17 shipped a single entry and wrote down the condition for changing it:
+ * "If the bar ever grows a set of entries rather than one, that is the moment to
+ * add `aria-current`." Item #19 completed the panel and left five of its six
+ * screens reachable only by typing a URL, so the set exists and the attribute
+ * came with it — in `admin-nav.tsx`, which is a client component precisely so it
+ * can read the current route itself instead of taking it from nine call sites
+ * that could each pass it wrong.
+ *
+ * The PRD's placement survives the change: the nav sits immediately before the
+ * sign-out button and Administradores is its last entry, so that entry is still
+ * "junto al de cerrar sesión".
  */
 
 export interface TopbarProps {
@@ -71,7 +78,11 @@ export interface TopbarProps {
   preloadLogo?: boolean;
 }
 
-/** Where the administrator door leads. Exported so the tests name it once. */
+/**
+ * Where the administrator door leads. Kept as an export because the PRD names
+ * this screen specifically and the tests assert its placement; the nav owns the
+ * full list.
+ */
 export const RUTA_ADMINISTRADORES = "/admin/administradores";
 
 export function Topbar({ usuario, preloadLogo = false }: TopbarProps) {
@@ -99,18 +110,14 @@ export function Topbar({ usuario, preloadLogo = false }: TopbarProps) {
 
         {/*
          * PRD: "El acceso a esta pantalla se ofrece desde un botón ubicado junto
-         * al de cerrar sesión, visible solo para administradores". Beside it, and
-         * before it: the way out is the last thing in the bar on every screen, so
-         * it does not move when the button next to it appears or disappears.
+         * al de cerrar sesión, visible solo para administradores". The whole nav
+         * obeys that: it is drawn only for administrators and it ends, right
+         * beside the way out, on Administradores.
          *
-         * `Link` and not an anchor: an internal navigation the client router
-         * should handle without a full document load.
+         * The way out stays last on every screen, so it does not move when the
+         * nav appears or disappears.
          */}
-        {usuario.esAdmin ? (
-          <Link className="lx-btn lx-btn-secondary" href={RUTA_ADMINISTRADORES}>
-            Administradores
-          </Link>
-        ) : null}
+        {usuario.esAdmin ? <AdminNav /> : null}
 
         <SignOutButton />
       </div>

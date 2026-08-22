@@ -88,7 +88,19 @@ function montar(
   areaPropia = "Operaciones",
 ): ReactNode {
   return (
-    <SWRConfig value={{ provider: () => new Map() }}>
+    <SWRConfig
+      value={{
+        provider: () => new Map(),
+        /*
+         * Sin estrangulador de foco. En producción SWR admite una revalidación
+         * por foco cada 5 s contados desde el montaje, lo que en una prueba
+         * significaría esperar 5 s reales para provocar la única revalidación
+         * que estas pruebas necesitan — la que hasta el ítem #19 ocurría sola al
+         * montar. El intervalo estrangulado no es lo que se está probando acá.
+         */
+        focusThrottleInterval: 0,
+      }}
+    >
       <Buzon sugerenciasIniciales={sugerenciasIniciales} areaPropia={areaPropia} />
     </SWRConfig>
   );
@@ -345,6 +357,19 @@ describe("el envío", () => {
   });
 });
 
+/**
+ * Dispara la revalidación por foco.
+ *
+ * Hasta el ítem #19 estas pruebas no necesitaban disparar nada: SWR consultaba
+ * sola al montar, incluso con `fallbackData`, y esa consulta redundante es el
+ * defecto que `lib/swr-pre-lectura.ts` corrige. El foco es el disparador más
+ * cercano a la realidad: es la mitad de la política del ADR 0007 que atiende al
+ * lector que vuelve a la pestaña.
+ */
+function revalidarPorFoco() {
+  window.dispatchEvent(new Event("focus"));
+}
+
 describe("cuando la revalidación de fondo no llega", () => {
   /**
    * Tres fallos distintos, tres tratamientos distintos. Este es el que nadie
@@ -356,6 +381,7 @@ describe("cuando la revalidación de fondo no llega", () => {
   it("avisa sin alarmar y deja la lista en su lugar", async () => {
     obtenerSugerencias.mockRejectedValue(new Error("GET /api/sugerencias respondió 500"));
     render(montar([APROBADA]));
+    revalidarPorFoco();
 
     expect(await screen.findByText(AVISO_SIN_ACTUALIZAR)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Firma digital de actas" })).toBeInTheDocument();
@@ -364,10 +390,26 @@ describe("cuando la revalidación de fondo no llega", () => {
   it("usa role=status, no role=alert", async () => {
     obtenerSugerencias.mockRejectedValue(new Error("falló"));
     render(montar([PENDIENTE]));
+    revalidarPorFoco();
 
     const aviso = await screen.findByText(AVISO_SIN_ACTUALIZAR);
 
     expect(aviso).toHaveAttribute("role", "status");
+  });
+
+  /*
+   * `app/(portal)/sugerencias/page.tsx` leyó esta lista en ESTE request. Pedirla
+   * otra vez al montar era un viaje redundante por página cargada.
+   */
+  it("no pide la lista al montar: el servidor ya la leyó", async () => {
+    render(montar([PENDIENTE]));
+
+    /* Después de vaciar las colas: la consulta del montaje cae en un microtask
+       posterior, así que una aserción síncrona pasaría por casualidad. */
+    await new Promise((listo) => setTimeout(listo, 0));
+
+    expect(obtenerSugerencias).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: "Tablero de peajes" })).toBeInTheDocument();
   });
 
   it("no lo muestra mientras todo va bien", () => {

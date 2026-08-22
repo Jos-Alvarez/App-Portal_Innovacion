@@ -1,5 +1,7 @@
 import type { SWRConfiguration } from "swr";
 
+import { SIN_REVALIDACION_AL_MONTAR } from "@/lib/swr-pre-lectura";
+
 import type { RecursoAsignado } from "@/lib/mis-recursos/repository";
 
 /**
@@ -101,9 +103,17 @@ export const RUTA_MIS_RECURSOS = "/api/mis-recursos";
  * - `shouldRetryOnError` (true, exponential backoff) — a failed refresh is
  *   usually a blip, and retrying costs nothing while the previous data is still
  *   on screen.
- * - `revalidateIfStale` (true) — this is what makes the mount after hydration
- *   re-ask, so a server render that sat in flight for a while is corrected
- *   immediately rather than at the first interval.
+ * WHAT IS NO LONGER LEFT AT ITS DEFAULT, AND WHY THIS PARAGRAPH CHANGED:
+ *
+ * `revalidateIfStale` used to be listed here as a deliberate default, described
+ * as "what makes the mount after hydration re-ask, so a server render that sat
+ * in flight for a while is corrected immediately rather than at the first
+ * interval". That description was accurate about the mechanism and wrong about
+ * the trade: it was buying a correction the interval and the focus revalidation
+ * both already provide, at the price of a redundant read on EVERY page load —
+ * for rows the server had just produced for that very request.
+ *
+ * `SIN_REVALIDACION_AL_MONTAR` turns it off and carries the whole argument.
  *
  * `keepPreviousData` is NOT set, and that is not an oversight: it only matters
  * when the key changes, and this key is a constant. What actually protects the
@@ -111,6 +121,9 @@ export const RUTA_MIS_RECURSOS = "/api/mis-recursos";
  * below.
  */
 export const OPCIONES_MIS_RECURSOS: SWRConfiguration<readonly RecursoAsignado[]> = {
+  /* `app/(portal)/page.tsx` reads the assignments for this request and hands
+     them down; the mount has nothing left to ask for. */
+  ...SIN_REVALIDACION_AL_MONTAR,
   refreshInterval: 60_000,
   revalidateOnFocus: true,
 };

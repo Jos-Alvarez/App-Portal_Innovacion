@@ -149,7 +149,19 @@ const SUELTA_DE_NUEVO: SugerenciaAdminDTO = { ...AGRUPADA_UNO, grupo: null };
  */
 function montar(sugerenciasIniciales: readonly SugerenciaAdminDTO[] = []): ReactNode {
   return (
-    <SWRConfig value={{ provider: () => new Map() }}>
+    <SWRConfig
+      value={{
+        provider: () => new Map(),
+        /*
+         * Sin estrangulador de foco. En producción SWR admite una revalidación
+         * por foco cada 5 s contados desde el montaje, lo que en una prueba
+         * significaría esperar 5 s reales para provocar la única revalidación
+         * que estas pruebas necesitan — la que hasta el ítem #19 ocurría sola al
+         * montar. El intervalo estrangulado no es lo que se está probando acá.
+         */
+        focusThrottleInterval: 0,
+      }}
+    >
       <SugerenciasAdmin sugerenciasIniciales={sugerenciasIniciales} />
     </SWRConfig>
   );
@@ -487,6 +499,19 @@ describe("los filtros por estado", () => {
   });
 });
 
+/**
+ * Dispara la revalidación por foco.
+ *
+ * Hasta el ítem #19 estas pruebas no necesitaban disparar nada: SWR consultaba
+ * sola al montar, incluso con `fallbackData`, y esa consulta redundante es el
+ * defecto que `lib/swr-pre-lectura.ts` corrige. El foco es el disparador más
+ * cercano a la realidad: es la mitad de la política del ADR 0007 que atiende al
+ * lector que vuelve a la pestaña.
+ */
+function revalidarPorFoco() {
+  window.dispatchEvent(new Event("focus"));
+}
+
 describe("las dos fallas, tratadas distinto", () => {
   /**
    * Una acción que la persona pidió y no ocurrió: alerta roja con la frase del
@@ -534,9 +559,25 @@ describe("las dos fallas, tratadas distinto", () => {
    * Un refresco de fondo que nadie pidió: aviso ámbar con `role="status"`, no
    * alerta roja. Todo lo que está en pantalla sigue siendo cierto.
    */
+  /*
+   * `app/admin/sugerencias/page.tsx` leyó esta bandeja en ESTE request. Pedirla
+   * otra vez al montar era un viaje redundante por página cargada.
+   */
+  it("no pide la bandeja al montar: el servidor ya la leyó", async () => {
+    render(montar([PENDIENTE]));
+
+    /* Después de vaciar las colas: la consulta del montaje cae en un microtask
+       posterior, así que una aserción síncrona pasaría por casualidad. */
+    await new Promise((listo) => setTimeout(listo, 0));
+
+    expect(obtenerTodas).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: "Tablero de peajes" })).toBeInTheDocument();
+  });
+
   it("avisa en ámbar cuando la revalidación falla, sin vaciar la lista", async () => {
     obtenerTodas.mockRejectedValue(new Error("500"));
     render(montar([PENDIENTE]));
+    revalidarPorFoco();
 
     const aviso = await screen.findByRole("status");
 

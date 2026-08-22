@@ -1,5 +1,7 @@
 import type { SWRConfiguration } from "swr";
 
+import { SIN_REVALIDACION_AL_MONTAR } from "@/lib/swr-pre-lectura";
+
 import { ERROR_INTERNO_REVISION } from "@/lib/sugerencias/errors";
 import type { SugerenciaAdminDTO } from "@/lib/sugerencias/repository";
 import type { EstadoSugerencia } from "@/lib/sugerencias/schema";
@@ -50,6 +52,9 @@ export function rutaEstado(id: number): string {
  * the morning's suggestions the moment they come back to the tab.
  */
 export const OPCIONES_TODAS: SWRConfiguration<readonly SugerenciaAdminDTO[]> = {
+  /* Same pre-read, same reason: `sugerencias-admin.tsx` is handed this list by
+     its own Server Component, so the mount has nothing to ask for. */
+  ...SIN_REVALIDACION_AL_MONTAR,
   refreshInterval: 60_000,
   revalidateOnFocus: true,
 };

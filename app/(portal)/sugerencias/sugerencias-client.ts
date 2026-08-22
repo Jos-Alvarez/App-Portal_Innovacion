@@ -1,5 +1,7 @@
 import type { SWRConfiguration } from "swr";
 
+import { SIN_REVALIDACION_AL_MONTAR } from "@/lib/swr-pre-lectura";
+
 import { ERROR_INTERNO } from "@/lib/sugerencias/errors";
 import type { SugerenciaDTO } from "@/lib/sugerencias/repository";
 import type { CrearSugerencia } from "@/lib/sugerencias/schema";
@@ -63,6 +65,11 @@ export const RUTA_SUGERENCIAS = "/api/sugerencias";
  * version without a line here changing to notice.
  */
 export const OPCIONES_SUGERENCIAS: SWRConfiguration<readonly SugerenciaDTO[]> = {
+  /* The server read this list for this request; see the module for why the
+     mount must not ask for it again. It also makes the note beside `mutate` in
+     `buzon.tsx` true as written: the cache really does stay empty until a
+     revalidation lands. */
+  ...SIN_REVALIDACION_AL_MONTAR,
   refreshInterval: 60_000,
   revalidateOnFocus: true,
 };
