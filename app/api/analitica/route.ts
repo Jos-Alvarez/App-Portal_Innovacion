@@ -1,12 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { dependenciasDe } from "@/lib/analitica/dependencias";
 import { ERROR_INTERNO, consultaInvalida } from "@/lib/analitica/errors";
-import {
-  agregarPorRecurso,
-  agregarPorUsuario,
-  agregarSugerencias,
-  leerDimensiones,
-} from "@/lib/analitica/repository";
 import { calcularAnalitica } from "@/lib/analitica/servicio";
 import { consultaSchema, leerConsulta } from "@/lib/analitica/schema";
 import { failureResponse } from "@/lib/api/errors";
@@ -32,9 +27,10 @@ import { prisma } from "@/lib/prisma";
  * search is not a page's initial state — and the same one `GET /api/mis-recursos`
  * made in item #8.
  *
- * Item #19 will still be free to read the default period on the server for its
- * first paint. Nothing here prevents that: `calcularAnalitica` takes injected
- * reads, so the page can call it with the same bindings this handler uses.
+ * Item #19 does exactly that, and still reads its FIRST period on the server:
+ * `calcularAnalitica` takes injected reads, so the page calls it with the very
+ * same bindings this handler uses (`lib/analitica/dependencias.ts`). The
+ * endpoint serves every period after that one.
  *
  * ══════════════════════════════════════════════════════════════════════════
  *  WHY THIS FILE IS SO THIN
@@ -65,23 +61,12 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   try {
-    const respuesta = await calcularAnalitica(consulta.data, new Date(), {
-      leerDimensiones: () => leerDimensiones(prisma),
-      /*
-       * The three `GROUP BY`s of one period, together. They are independent, so
-       * the round trips overlap; and they are bound HERE rather than inside the
-       * service so that the service never learns what a Prisma client is.
-       */
-      agregar: async (periodo) => {
-        const [porRecurso, porUsuario, sugerencias] = await Promise.all([
-          agregarPorRecurso(prisma, periodo),
-          agregarPorUsuario(prisma, periodo),
-          agregarSugerencias(prisma, periodo),
-        ]);
-
-        return { porRecurso, porUsuario, sugerencias };
-      },
-    });
+    /*
+     * The reads are bound OUTSIDE the service so it never learns what a Prisma
+     * client is, and outside this handler so item #19's page — the other caller
+     * of `calcularAnalitica` — spends the same round trips this one does.
+     */
+    const respuesta = await calcularAnalitica(consulta.data, new Date(), dependenciasDe(prisma));
 
     return NextResponse.json(respuesta);
   } catch (error) {

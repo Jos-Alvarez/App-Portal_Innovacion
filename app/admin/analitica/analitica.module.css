@@ -1,0 +1,211 @@
+/*
+ * La pantalla de analítica. Como en el resto del panel, nada de esto es un
+ * componente nuevo: los chips, el switch, los campos y la tabla son los
+ * compartidos. Este archivo los ordena y viste las dos cosas que la capa de
+ * componentes no trae — la tarjeta de una cifra y la celda que pone una cifra
+ * junto a la del periodo anterior.
+ *
+ * No hay gráficos. ADR 0010 sirve agregaciones en vivo y el PRD pide "ranking",
+ * "distribución" y "adopción": son listas ordenadas y proporciones, y una tabla
+ * las dice sin pedirle al lector que estime una altura. Un gráfico se justifica
+ * cuando la forma de la serie es el hallazgo; acá el hallazgo es qué recurso
+ * encabeza la lista y con cuántos usos.
+ */
+
+.main {
+  display: grid;
+  gap: 24px;
+  align-content: start;
+  max-width: 1180px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 28px 24px 64px;
+}
+
+.header {
+  display: grid;
+  gap: 6px;
+}
+
+/* El periodo y su comparación: una sola pregunta, en una sola tarjeta. */
+.controles {
+  display: grid;
+  gap: 16px;
+  padding: 20px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fechas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.fechas > * {
+  flex: 0 1 200px;
+}
+
+.comparar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Qué periodo se está mirando: encabeza todo lo de abajo, así que va suelto. */
+.periodo {
+  margin: 0;
+  font-size: var(--fs-body);
+}
+
+/* Error de entrada: DESIGN.md reserva el rojo para el error y la destrucción. */
+.alerta {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 7px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: var(--fs-body-sm);
+  font-weight: 600;
+}
+
+/* Aviso: lo que hay en pantalla sigue siendo válido, solo puede estar viejo. */
+.aviso {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface2);
+  color: var(--muted);
+  font-size: var(--fs-body-sm);
+}
+
+/*
+ * Las cinco cifras de cabecera. `auto-fit` con un mínimo en vez de un número
+ * fijo de columnas: en un monitor entran las cinco en fila, en una laptop se
+ * parten en dos filas solas, y nadie tiene que mantener un breakpoint por cada
+ * tarjeta que se agregue.
+ */
+.resumen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+}
+
+.tarjeta {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.tarjeta p {
+  margin: 0;
+}
+
+.cifra {
+  font-size: 28px;
+  font-weight: var(--fw-title);
+  letter-spacing: var(--ls-title);
+  line-height: 1.15;
+}
+
+.panel {
+  display: grid;
+  gap: 14px;
+}
+
+.panelHeader {
+  display: grid;
+  gap: 4px;
+}
+
+.panelHeader p {
+  margin: 0;
+}
+
+.panelTitulo {
+  margin: 0;
+  font-size: var(--fs-body);
+  font-weight: 700;
+}
+
+.tabla {
+  padding: 8px 24px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  overflow-x: auto;
+}
+
+/* Nombre del recurso o de la persona, con su chip y su nota al lado. */
+.celdaNombre {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Una baja lógica sigue en el reporte: el uso ocurrió. El nombre lo dice. */
+.celdaNombre [data-baja="true"] {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+/*
+ * La celda de comparación: el valor anterior y la diferencia.
+ *
+ * Sin color en el signo — el componente explica por qué: subir no es bueno en
+ * todos los paneles, y el rojo ya tiene dueño en DESIGN.md.
+ */
+.comparado {
+  display: inline-flex;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: flex-end;
+  color: var(--muted);
+  font-size: var(--fs-meta);
+}
+
+.diferencia {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+/* Los cinco estados de una sugerencia, con sus ceros. */
+.estados {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.estado {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.cifraEstado {
+  font-size: var(--fs-body);
+  font-weight: 700;
+}

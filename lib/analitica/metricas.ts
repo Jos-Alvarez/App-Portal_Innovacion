@@ -35,8 +35,21 @@ import { ESTADOS_SUGERENCIA, type EstadoSugerencia } from "@/lib/sugerencias/sch
  * would look like the metric failed.
  */
 
-/** The five typed processing errors, derived so they cannot drift from the vocabulary. */
-export const TIPOS_ERROR = TIPOS_EVENTO.filter((tipo) => tipo.startsWith("error_"));
+/**
+ * The five typed processing errors, derived so they cannot drift from the
+ * vocabulary.
+ *
+ * The predicate is what makes the derivation hold at the TYPE level too. A plain
+ * `filter` narrows nothing, so `TipoError` would have been the whole event
+ * vocabulary — `apertura` and `ejecucion` included — and every `Record<TipoError,
+ * ...>` in this file would have demanded two keys that can never appear in it.
+ * Item #19 is the first consumer to feel that: it labels each error column, and
+ * without the predicate it would have had to invent a label for "apertura" in a
+ * table of failures.
+ */
+export const TIPOS_ERROR = TIPOS_EVENTO.filter(
+  (tipo): tipo is Extract<TipoEvento, `error_${string}`> => tipo.startsWith("error_"),
+);
 
 export type TipoError = (typeof TIPOS_ERROR)[number];
 
