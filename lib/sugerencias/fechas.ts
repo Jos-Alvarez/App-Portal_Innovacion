@@ -35,9 +35,21 @@
  *
  * `sugerencias-client.ts` re-exports both names, so item #13's call sites and
  * its suite are untouched by the move.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  AND WHY THE ZONE ITSELF LEFT AGAIN, ONE LEVEL FURTHER DOWN
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * Item #18's analytics engine needs the same zone to decide where "hoy" begins,
+ * which is the same argument one level up: two features sharing a fact. So
+ * `ZONA_HORARIA` now lives in `lib/zona-horaria.ts` and is re-exported here,
+ * exactly as `sugerencias-client.ts` re-exports these two functions. Nothing
+ * that imported it from this module has to change.
  */
 
-export const ZONA_HORARIA = "America/Lima";
+import { ZONA_HORARIA } from "@/lib/zona-horaria";
+
+export { ZONA_HORARIA };
 
 const FORMATO_FECHA = new Intl.DateTimeFormat("es-PE", {
   day: "2-digit",
