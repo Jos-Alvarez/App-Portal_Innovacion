@@ -106,24 +106,48 @@ describe("<Topbar />", () => {
   });
 
   /**
-   * The PRD places the entry BESIDE the way out, and it still is: the nav ends on
-   * Administradores and the nav itself is the last thing before sign-out. Keeping
-   * sign-out last means the way out does not move when the nav appears or
-   * disappears.
+   * The PRD asks for the administrator entry "junto al de cerrar sesión", and it
+   * still is — but the two swapped rows, so what is asserted swapped with them.
+   *
+   * The bar is now two rows: the session cluster ends the logo's row on the
+   * sign-out control, and the nav takes the row underneath, ending on
+   * Administradores. The two are the closest pair the bar has, and the order is
+   * the reverse of what it was until the controls became icons.
    *
    * Asserted through the DOM and not through the array's order, because that
-   * order is exactly what a well-meaning alphabetical sort would change.
+   * order is exactly what a well-meaning alphabetical sort would change — and
+   * asserted through DOM position and not CSS, because the reading order a
+   * screen reader follows is the DOM's, and no `order` property is faking it.
    */
-  it("deja Administradores junto a cerrar sesión, y cerrar sesión al final", () => {
+  it("cierra el grupo de sesión con la salida y la fila siguiente con Administradores", () => {
     render(<Topbar usuario={ADMINISTRADORA} />);
 
     const enlace = screen.getByRole("link", { name: "Administradores" });
     const salir = screen.getByRole("button", { name: /cerrar sesión/i });
     const nav = screen.getByRole("navigation", { name: "Administración" });
 
-    expect(enlace.compareDocumentPosition(salir) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(salir.compareDocumentPosition(enlace) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(nav.lastElementChild).toBe(enlace);
-    expect(nav.nextElementSibling).toBe(salir);
+    expect(nav.previousElementSibling).toBe(salir.closest("div"));
+  });
+
+  /**
+   * Both controls lost their words, so the accessible name is now the ONLY name
+   * either of them has. A refactor that drops an `aria-label` would leave two
+   * unlabelled buttons that look fine and announce nothing.
+   */
+  it("deja los dos controles sin texto visible pero con nombre accesible", () => {
+    render(<Topbar usuario={COLABORADORA} />);
+
+    for (const nombre of [/modo (oscuro|claro)/i, /cerrar sesión/i]) {
+      expect(screen.getByRole("button", { name: nombre })).toHaveAccessibleName();
+    }
+
+    /* Las palabras que estos dos botones pintaban antes ya no están en pantalla:
+       el glifo ☾ y el SVG quedan fuera porque están marcados `aria-hidden`. */
+    for (const palabra of ["Oscuro", "Claro", "Cerrar sesión"]) {
+      expect(screen.queryByText(palabra)).not.toBeInTheDocument();
+    }
   });
 
   it("lleva el logo de Lima Expresa, que el PRD pide dentro del portal", () => {

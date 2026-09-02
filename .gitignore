@@ -50,3 +50,6 @@ Desktop.ini
 
 # Nota: `prisma/migrations/` NO se ignora — el historial de migraciones se
 # versiona.
+
+# Sentinela del harness de verificacion documental (efimero, no se versiona)
+.claude/.verificacion-documental.lock

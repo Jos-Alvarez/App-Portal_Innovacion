@@ -102,25 +102,35 @@ export function Topbar({ usuario, preloadLogo = false }: TopbarProps) {
         <span className={styles.marca}>Portal de Innovación</span>
       </Link>
 
+      {/*
+       * The session cluster: what you can do to your own session, and who the
+       * portal thinks you are — pinned to the far end of the logo's own row.
+       *
+       * The two controls sit to the LEFT of the name and carry no words. Below
+       * them the panel nav spends six labels in a row, and a labelled toggle and
+       * a text sign-out read as two more entries in that set rather than as
+       * something outside it. Dropping to marks separates the two jobs by shape,
+       * which is cheaper than separating them by distance in a bar this full.
+       *
+       * The name is the guard's, re-read from SQL Server on this request, not one
+       * carried in the session token.
+       */}
       <div className={styles.sesion}>
-        {/* The name the guard re-read from SQL Server on this request, not one
-            carried in the session token. */}
-        <span className="lx-meta">{usuario.nombre}</span>
         <ThemeToggle />
-
-        {/*
-         * PRD: "El acceso a esta pantalla se ofrece desde un botón ubicado junto
-         * al de cerrar sesión, visible solo para administradores". The whole nav
-         * obeys that: it is drawn only for administrators and it ends, right
-         * beside the way out, on Administradores.
-         *
-         * The way out stays last on every screen, so it does not move when the
-         * nav appears or disappears.
-         */}
-        {usuario.esAdmin ? <AdminNav /> : null}
-
         <SignOutButton />
+        <span className="lx-meta">{usuario.nombre}</span>
       </div>
+
+      {/*
+       * PRD: "El acceso a esta pantalla se ofrece desde un botón ubicado junto
+       * al de cerrar sesión, visible solo para administradores". Drawn only for
+       * administrators, and Administradores is still its last entry — the one
+       * closest to the sign-out control the cluster above ends with.
+       *
+       * It takes the second row on its own (`flex-basis: 100%`), which is what
+       * keeps the name and the two marks on the logo's line at every width.
+       */}
+      {usuario.esAdmin ? <AdminNav /> : null}
     </div>
   );
 }

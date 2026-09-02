@@ -257,6 +257,50 @@ a {
 }
 
 /*
+ * Icon-only button — the topbar's theme toggle and its way out.
+ *
+ * DERIVED from the secondary treatment rather than invented: same border token,
+ * same transparent rest state, same --navy-fg on hover. What changes is that the
+ * label is gone, so the shape becomes a circle sized by `--tap` instead of a
+ * rectangle sized by its text.
+ *
+ * 34px is the smallest square that still clears the pointer target these two
+ * controls need; below that the theme toggle becomes hard to hit on a laptop
+ * trackpad, and signing out by accident is not a mistake worth designing in.
+ *
+ * DECLARED AFTER THE VARIANTS ON PURPOSE. It carries the same specificity as
+ * `.lx-btn-text`, so it has to come last to win the padding it overrides.
+ */
+.lx-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.lx-icon-btn:hover:not(:disabled) {
+  border-color: var(--cyan);
+  background: var(--cyan-soft);
+  color: var(--navy-fg);
+}
+
+.lx-icon-btn:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+/*
  * Skeleton shimmer — the `lx-shimmer` treatment DESIGN.md names for the Carga
  * state. A cyan-soft highlight sweeps across the row-hover surface, so it reads
  * as the same system in both palettes.

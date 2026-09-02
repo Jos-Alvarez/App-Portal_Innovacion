@@ -58,11 +58,12 @@ import styles from "./topbar.module.css";
  * catalogue, hand it out, read what comes back, measure it.
  *
  * ADMINISTRADORES IS LAST, AND THAT POSITION IS A REQUIREMENT RATHER THAN A
- * PREFERENCE. The PRD asks for its entry "junto al de cerrar sesión", and this
- * nav is rendered immediately before the sign-out button — so the last entry is
- * the one beside it. Sorting this list alphabetically, or by any other rule that
- * moved it, would quietly break a line of the PRD that item #17 implemented on
- * purpose.
+ * PREFERENCE. The PRD asks for its entry "junto al de cerrar sesión". The bar is
+ * now two rows — the session cluster ends the logo's row on the sign-out
+ * control, this nav takes the row underneath — so the LAST entry is the one that
+ * lands closest to it, diagonally adjacent instead of side by side. Sorting this
+ * list alphabetically, or by any other rule that moved it, would quietly break a
+ * line of the PRD that item #17 implemented on purpose.
  */
 export const ENLACES_ADMIN = [
   { href: "/admin/enlaces", etiqueta: "Enlaces" },

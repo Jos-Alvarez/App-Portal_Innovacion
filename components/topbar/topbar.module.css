@@ -50,16 +50,16 @@
 }
 
 /*
- * Pushes the identity and the actions to the far end of the bar.
+ * El grupo de sesión: los dos íconos y el nombre, a la altura del logo y contra
+ * el borde derecho. `auto` se come todo el espacio libre de la primera fila.
  *
- * `flex-wrap` is what keeps the cluster usable on a narrow screen now that it
- * holds four things instead of two: the buttons drop to their own line rather
- * than squeezing the name out of the bar.
+ * `flex-wrap` sigue puesto para una pantalla muy angosta: ahí el nombre baja de
+ * línea debajo de sus dos controles en vez de desbordar la barra.
  */
 .sesion {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px;
+  gap: 10px;
   align-items: center;
   margin-left: auto;
 }
@@ -73,12 +73,20 @@
  * evita inventar un tercer lenguaje para "dónde estoy" en una interfaz que ya
  * tiene uno.
  *
- * Envuelve por su cuenta: en una pantalla angosta las seis entradas bajan de
- * línea en vez de empujar el nombre fuera de la barra.
+ * `flex-basis: 100%` le da la segunda fila entera: la barra ya envolvía sola en
+ * cuanto la nav creció a seis entradas, pero envolvía por ancho y lo primero que
+ * se caía era el nombre. Declarar la fila en vez de esperar a que el viewport la
+ * provoque deja el grupo de sesión arriba en cualquier ancho, sin media queries.
+ *
+ * Alineada a la izquierda, arrancando bajo el logo: las seis entradas son la
+ * navegación del portal, y una navegación se lee desde el mismo borde donde
+ * empieza todo lo demás de la pantalla. El grupo de sesión es lo que vive contra
+ * el borde opuesto, y así los dos bloques no compiten por la misma esquina.
  */
 .adminNav {
   display: flex;
   flex-wrap: wrap;
+  flex-basis: 100%;
   gap: 6px;
   align-items: center;
 }
