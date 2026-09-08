@@ -1,7 +1,9 @@
-import NextAuth from "next-auth";
+import NextAuth, { customFetch } from "next-auth";
 import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 
 import { readAuthEnv } from "@/lib/auth/env";
+import { fetchSinCache } from "@/lib/auth/fetch";
+import { mapToSessionUser } from "@/lib/auth/identity";
 import { fetchDepartment } from "@/lib/auth/graph";
 import { authorizeAndSyncUsuario } from "@/lib/auth/sign-in";
 import { upsertUsuario } from "@/lib/auth/usuario-repository";
@@ -27,14 +29,70 @@ import { prisma } from "@/lib/prisma";
  * `User.Read` is what authorizes the Graph department lookup — no extra
  * permission and no admin consent are needed for it.
  */
+
+/**
+ * Read once, into a name of its own, because TWO things need it and only one of
+ * them can reach it afterwards: the provider gets it as configuration, and the
+ * fetch below needs it to substitute the tenant. `entraId.issuer` is NOT that
+ * value — `@auth/core` normalises providers by spreading them into a new object
+ * and merging the options into THAT, so the object built here never receives
+ * the merged `issuer` and reading it back would silently yield `undefined`.
+ */
+const ISSUER = process.env.AUTH_MICROSOFT_ENTRA_ID_ISSUER;
+
+const entraId = MicrosoftEntraID({
+  clientId: process.env.AUTH_MICROSOFT_ENTRA_ID_ID,
+  clientSecret: process.env.AUTH_MICROSOFT_ENTRA_ID_SECRET,
+  issuer: ISSUER,
+
+  /*
+   * REPLACES the provider's own mapping, which reads `profile.email` and
+   * nothing else. `lib/auth/identity.ts` explains why that is not enough here
+   * and why the session has to be built from the same claims the sign-in
+   * decision reads. A string key, so `@auth/core`'s merge does apply it —
+   * unlike the symbol below.
+   */
+  profile: (profile) => mapToSessionUser(profile),
+});
+
+/**
+ * Every request of the OAuth flow, off Next's fetch cache.
+ *
+ * WHY IT IS ASSIGNED HERE AND NOT PASSED IN THE CONFIG ABOVE: `customFetch` is
+ * a SYMBOL, and `@auth/core` merges provider options with a `for...in` loop,
+ * which enumerates string keys only. A symbol handed to the factory is dropped
+ * without a word — this assignment is the only way to be sure it takes effect.
+ *
+ * `lib/auth/fetch.ts` explains what the global fetch breaks and why an OAuth
+ * exchange never belonged in a cache to begin with. This REPLACES the
+ * provider's own `customFetch`, so the one thing that one did has to be done
+ * here too: Microsoft's discovery document announces its issuer with a literal
+ * `{tenantid}` placeholder, and `oauth4webapi` rejects the mismatch unless it
+ * is substituted for the tenant this application is registered in.
+ */
+entraId[customFetch] = async (...args) => {
+  const pedir = fetchSinCache();
+  const url = new URL(args[0] instanceof Request ? args[0].url : String(args[0]));
+
+  if (!url.pathname.endsWith(".well-known/openid-configuration")) {
+    return pedir(...args);
+  }
+
+  const response = await pedir(...args);
+
+  /* Not `clone()`: the body is read once and a fresh Response is built from it,
+     so nothing downstream can inherit a half-consumed one. */
+  const documento = (await response.json()) as { issuer: string };
+  const tenantId = ISSUER?.match(/microsoftonline\.com\/(\w+)\/v2\.0/)?.[1] ?? "common";
+
+  return Response.json({
+    ...documento,
+    issuer: documento.issuer.replace("{tenantid}", tenantId),
+  });
+};
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  providers: [
-    MicrosoftEntraID({
-      clientId: process.env.AUTH_MICROSOFT_ENTRA_ID_ID,
-      clientSecret: process.env.AUTH_MICROSOFT_ENTRA_ID_SECRET,
-      issuer: process.env.AUTH_MICROSOFT_ENTRA_ID_ISSUER,
-    }),
-  ],
+  providers: [entraId],
 
   /**
    * JWT sessions, with no database adapter.

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   isAdminEmail,
   isEmailFromAllowedDomain,
+  mapToSessionUser,
   mapToUsuarioUpsert,
   normalizeEmail,
   selectIdentityEmail,
@@ -107,6 +108,41 @@ describe("isAdminEmail", () => {
       expect(isAdminEmail("jose@corp.com", value)).toBe(false);
       expect(isAdminEmail(value, value)).toBe(false);
     }
+  });
+});
+
+describe("mapToSessionUser", () => {
+  it("usa el mismo correo que decide el login, con el fallback al UPN", () => {
+    /* Sin este fallback la sesión queda sin dirección y el guard de cada
+       pantalla responde «Tu sesión ya no está activa» a alguien que acaba de
+       entrar bien. */
+    expect(mapToSessionUser({ sub: "abc", preferred_username: "Rosa@LimaExpresa.pe" })).toEqual({
+      id: "abc",
+      name: null,
+      email: "rosa@limaexpresa.pe",
+    });
+  });
+
+  it("prefiere el claim email cuando el directorio sí lo trae", () => {
+    expect(
+      mapToSessionUser({
+        sub: "abc",
+        email: "Rosa.Diaz@LimaExpresa.pe",
+        preferred_username: "rosa@limaexpresa.pe",
+        name: "  Rosa Díaz  ",
+      }),
+    ).toEqual({ id: "abc", name: "Rosa Díaz", email: "rosa.diaz@limaexpresa.pe" });
+  });
+
+  it("lleva el sub como id, no la dirección", () => {
+    /* Una dirección se puede reasignar; el `sub` de Entra ID no. */
+    expect(mapToSessionUser({ sub: "9f3c", email: "rosa@limaexpresa.pe" }).id).toBe("9f3c");
+  });
+
+  it("deja el nombre en null en vez de inventarle la dirección", () => {
+    /* A diferencia de la fila `usuario`: lo que la pantalla muestra viene de la
+       base, que sí aplica ese respaldo. */
+    expect(mapToSessionUser({ sub: "abc", email: "rosa@limaexpresa.pe" }).name).toBeNull();
   });
 });
 

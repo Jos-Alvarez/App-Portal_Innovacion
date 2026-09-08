@@ -112,6 +112,47 @@ export function isAdminEmail(email: unknown, adminEmail: unknown): boolean {
   return candidate !== "" && candidate === configured;
 }
 
+/** The user the session carries. Identity only — never a role (ADR 0007). */
+export interface SessionUser {
+  id: string;
+  name: string | null;
+  email: string;
+}
+
+/**
+ * Builds the user the SESSION will carry, from the same claims the sign-in
+ * decision reads.
+ *
+ * WHY THIS EXISTS AT ALL. The Entra ID provider's own `profile()` maps
+ * `email: profile.email` and stops there — the very gap `selectIdentityEmail`
+ * above was written to close. Leaving the provider's mapping in place made the
+ * two halves of the login disagree: an account with no `mail` attribute in the
+ * directory signed in fine, because the decision used the UPN fallback, and
+ * then met "Tu sesión ya no está activa" on every screen, because the session
+ * carried no address for `lib/authz/request-source.ts` to look the row up by.
+ *
+ * ONE ANSWER TO "WHO IS THIS", USED TWICE. The address that admits a user and
+ * the address that identifies them afterwards must be the same string, or the
+ * `usuario` row written at sign-in is not the row the guard reads on the next
+ * request.
+ *
+ * `id` is the `sub` claim — Entra ID's immutable subject — and NOT the address:
+ * an address can be reassigned, and Auth.js uses this value as the token's
+ * subject. `image` is deliberately absent: the provider's default `profile()`
+ * fetched a photo from Graph on every single login, and nothing in this portal
+ * renders one — the topbar draws initials.
+ */
+export function mapToSessionUser(claims: IdentityClaims & { sub?: unknown }): SessionUser {
+  return {
+    id: normalizeText(claims.sub),
+    /* NOT the address as a fallback, unlike the `usuario` row: a blank name is
+       legal in a session, and `nombre` is what the portal actually displays —
+       it comes from the database, which does apply that fallback. */
+    name: normalizeText(claims.name) || null,
+    email: selectIdentityEmail(claims),
+  };
+}
+
 /**
  * Builds the `usuario` row from the identity claims plus the `department`
  * read from Microsoft Graph.
