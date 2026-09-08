@@ -16,10 +16,15 @@ import {
 } from "@/lib/enlaces/schema";
 
 import { ETIQUETA_TIPO } from "@/lib/enlaces/etiquetas";
-import styles from "./enlaces.module.css";
+import styles from "./catalogo.module.css";
 
 /**
- * The alta and the edición, as one inline panel.
+ * The alta and the edición, as one form — shown inside the screen's Modal.
+ *
+ * IT DOES NOT DRESS ITSELF AS A CARD, and it carries no heading: the Modal is
+ * the surface and owns the title, which is also what `aria-labelledby` points
+ * at. A second border and a second `<h2>` inside it would be a card drawn over
+ * a card.
  *
  * ONE FORM FOR BOTH, because an edit and a creation collect the same four
  * fields. `crearEnlaceSchema` describes all four as present, which is why it
@@ -43,7 +48,7 @@ export interface EnlaceFormProps {
   enviando: boolean;
   /** Receives the schema's OUTPUT — trimmed, normalised, blank collapsed to null. */
   onSubmit: (datos: CrearEnlace) => void;
-  /** Leaves the edit without applying it. */
+  /** Closes the panel without applying it — an alta and an edición alike. */
   onCancelar: () => void;
 }
 
@@ -93,9 +98,7 @@ export function EnlaceForm({ enlace, enviando, onSubmit, onCancelar }: EnlaceFor
     error !== null && !["nombre", "descripcion", "url"].includes(error.campo) ? error.mensaje : null;
 
   return (
-    <form className={styles.panel} onSubmit={enviar} noValidate>
-      <h2 className={styles.panelTitle}>{editando ? "Editar enlace" : "Nuevo enlace"}</h2>
-
+    <form className={styles.formulario} onSubmit={enviar} noValidate>
       <div className={styles.fields}>
         <Input
           label="Nombre"
@@ -149,15 +152,16 @@ export function EnlaceForm({ enlace, enviando, onSubmit, onCancelar }: EnlaceFor
         </p>
       ) : null}
 
+      {/* Cancelar primero y el envío al final, contra el borde derecho: es el
+          orden en que se leen las dos salidas de un diálogo, y la que aplica
+          algo queda donde termina el recorrido. */}
       <div className={styles.acciones}>
+        <Button variant="secondary" disabled={enviando} onClick={onCancelar}>
+          Cancelar
+        </Button>
         <Button type="submit" variant="primary" disabled={enviando}>
           {editando ? "Guardar cambios" : "Agregar enlace"}
         </Button>
-        {editando ? (
-          <Button variant="secondary" disabled={enviando} onClick={onCancelar}>
-            Cancelar
-          </Button>
-        ) : null}
       </div>
     </form>
   );

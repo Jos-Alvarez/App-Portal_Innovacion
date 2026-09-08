@@ -7,7 +7,7 @@ vi.mock("next-auth/react", () => ({ signOut: vi.fn() }));
    router. Su propio archivo de pruebas cubre el resaltado. */
 vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
 
-import { RUTA_ADMINISTRADORES, Topbar } from "./topbar";
+import { Topbar } from "./topbar";
 
 /**
  * The shared topbar item #17 extracted, and the one decision it makes: whether
@@ -50,104 +50,81 @@ describe("<Topbar />", () => {
     expect(within(inicio).getByRole("img")).toBeInTheDocument();
   });
 
-  it("deja el cambio de tema al alcance de cualquiera", () => {
+  /**
+   * El tema y la salida ya no viven sueltos en la barra: cuelgan del menú de
+   * sesión, y lo que la barra garantiza es que ese menú esté ahí para cualquiera.
+   * Lo que hay adentro lo cubre `session-menu.test.tsx`.
+   */
+  it("le da a cualquiera el menú de sesión, cerrado", () => {
     render(<Topbar usuario={COLABORADORA} />);
 
-    expect(screen.getByRole("button", { name: /modo (oscuro|claro)/i })).toBeInTheDocument();
+    const disparador = screen.getByRole("button", { name: "Ana Quispe" });
+
+    expect(disparador).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
-  it("ofrece cerrar sesión a cualquiera", () => {
-    render(<Topbar usuario={COLABORADORA} />);
-
-    expect(screen.getByRole("button", { name: /cerrar sesión/i })).toBeInTheDocument();
-  });
-
-  /* PRD: "un botón ubicado junto al de cerrar sesión, visible solo para administradores". */
-  it("no le muestra la puerta de administradores a un colaborador", () => {
-    render(<Topbar usuario={COLABORADORA} />);
-
-    expect(screen.queryByRole("link", { name: /administradores/i })).not.toBeInTheDocument();
-  });
-
-  it("se la muestra a una administradora", () => {
-    render(<Topbar usuario={ADMINISTRADORA} />);
-
-    expect(screen.getByRole("link", { name: "Administradores" })).toHaveAttribute(
-      "href",
-      RUTA_ADMINISTRADORES,
-    );
-  });
-
-  /* Las seis pantallas del panel, alcanzables sin escribir una URL a mano. */
-  it("ofrece las seis pantallas de administración", () => {
+  /* Las cuatro pantallas de todos los días, alcanzables sin escribir una URL.
+     Eran cinco hasta que Enlaces y Procesadores se fundieron en Catálogo. */
+  it("ofrece las cuatro pantallas de administración", () => {
     render(<Topbar usuario={ADMINISTRADORA} />);
 
     const nav = screen.getByRole("navigation", { name: "Administración" });
 
-    expect(within(nav).getAllByRole("link")).toHaveLength(6);
+    expect(within(nav).getAllByRole("link")).toHaveLength(4);
 
-    for (const etiqueta of [
-      "Enlaces",
-      "Procesadores",
-      "Asignaciones",
-      "Sugerencias",
-      "Analítica",
-      "Administradores",
-    ]) {
+    for (const etiqueta of ["Catálogo", "Asignaciones", "Sugerencias", "Analítica"]) {
       expect(within(nav).getByRole("link", { name: etiqueta })).toBeInTheDocument();
     }
   });
 
+  /**
+   * La puerta de administradores ya NO está en la barra. El PRD la pide "junto al
+   * de cerrar sesión" y ahí es donde está ahora: dentro del menú de sesión, que
+   * `session-menu.test.tsx` cubre. Que vuelva a aparecer acá sería la regresión.
+   */
+  it("no deja la puerta de administradores en la barra", () => {
+    render(<Topbar usuario={ADMINISTRADORA} />);
+
+    expect(screen.queryByRole("link", { name: /administradores/i })).not.toBeInTheDocument();
+  });
+
   /* Mostrar no es autorizar: cada `/admin/*` corre su propio guard igual. */
-  it("no le muestra ninguna de las seis a un colaborador", () => {
+  it("no le muestra ninguna al colaborador", () => {
     render(<Topbar usuario={COLABORADORA} />);
 
     expect(screen.queryByRole("navigation", { name: "Administración" })).not.toBeInTheDocument();
   });
 
   /**
-   * The PRD asks for the administrator entry "junto al de cerrar sesión", and it
-   * still is — but the two swapped rows, so what is asserted swapped with them.
+   * El orden de la fila: primero la nav del panel, después el grupo de sesión
+   * contra el borde opuesto.
    *
-   * The bar is now two rows: the session cluster ends the logo's row on the
-   * sign-out control, and the nav takes the row underneath, ending on
-   * Administradores. The two are the closest pair the bar has, and the order is
-   * the reverse of what it was until the controls became icons.
-   *
-   * Asserted through the DOM and not through the array's order, because that
-   * order is exactly what a well-meaning alphabetical sort would change — and
-   * asserted through DOM position and not CSS, because the reading order a
-   * screen reader follows is the DOM's, and no `order` property is faking it.
+   * Afirmado por posición en el DOM y no por CSS, porque el orden de lectura que
+   * sigue un lector de pantalla es el del DOM y ninguna propiedad `order` lo está
+   * simulando.
    */
-  it("cierra el grupo de sesión con la salida y la fila siguiente con Administradores", () => {
+  it("pone la nav antes del menú de sesión", () => {
     render(<Topbar usuario={ADMINISTRADORA} />);
 
-    const enlace = screen.getByRole("link", { name: "Administradores" });
-    const salir = screen.getByRole("button", { name: /cerrar sesión/i });
+    const disparador = screen.getByRole("button", { name: "Rosa Díaz" });
     const nav = screen.getByRole("navigation", { name: "Administración" });
 
-    expect(salir.compareDocumentPosition(enlace) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(nav.lastElementChild).toBe(enlace);
-    expect(nav.previousElementSibling).toBe(salir.closest("div"));
+    expect(nav.compareDocumentPosition(disparador) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(nav.nextElementSibling).toBe(disparador.parentElement);
   });
 
   /**
-   * Both controls lost their words, so the accessible name is now the ONLY name
-   * either of them has. A refactor that drops an `aria-label` would leave two
-   * unlabelled buttons that look fine and announce nothing.
+   * Con el menú cerrado, ni el tema ni la salida están en el DOM. Es lo que
+   * separa un menú de un grupo de controles escondido con CSS: si estuvieran
+   * renderizados, un lector de pantalla los recorrería igual.
    */
-  it("deja los dos controles sin texto visible pero con nombre accesible", () => {
+  it("no deja el tema ni la salida sueltos en la barra", () => {
     render(<Topbar usuario={COLABORADORA} />);
 
-    for (const nombre of [/modo (oscuro|claro)/i, /cerrar sesión/i]) {
-      expect(screen.getByRole("button", { name: nombre })).toHaveAccessibleName();
-    }
-
-    /* Las palabras que estos dos botones pintaban antes ya no están en pantalla:
-       el glifo ☾ y el SVG quedan fuera porque están marcados `aria-hidden`. */
-    for (const palabra of ["Oscuro", "Claro", "Cerrar sesión"]) {
-      expect(screen.queryByText(palabra)).not.toBeInTheDocument();
-    }
+    expect(screen.queryByRole("menuitem")).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitemcheckbox")).not.toBeInTheDocument();
+    expect(screen.queryByText("Cerrar sesión")).not.toBeInTheDocument();
   });
 
   it("lleva el logo de Lima Expresa, que el PRD pide dentro del portal", () => {
@@ -156,3 +133,4 @@ describe("<Topbar />", () => {
     expect(container.querySelector("img")).toBeInTheDocument();
   });
 });
+

@@ -1,55 +1,51 @@
 /*
- * The admin catalogue screen of backlog item #6. Nothing here is a new
- * component: the form fields, the table, the chips, the switch and the buttons
- * are the shared ones. This file lays them out and dresses the two controls
- * DESIGN.md describes but the components layer does not ship — a <select> and
- * the field hints — with the treatment "Componentes" already prescribes.
+ * La pantalla de Catálogo: enlaces y procesadores en una sola tabla.
  *
- * It follows `app/admin/enlaces/enlaces.module.css` and adds only what this
- * resource genuinely needs: the hint under a field, and the two cap blocks that
- * make "sin tope" a visible state instead of an empty box.
+ * Nace de fundir `enlaces.module.css` y `procesadores.module.css`, que ya eran
+ * casi el mismo archivo — misma tarjeta, misma tabla, mismos chips — y diferían
+ * solo en lo que cada recurso necesita de más. Nada de esto es un componente
+ * nuevo: son los compartidos, más los dos controles que DESIGN.md describe y la
+ * capa de componentes no entrega (un <select> y la pista bajo un campo), con el
+ * tratamiento que "Componentes" ya prescribe para los inputs.
  */
 
-.main {
-  display: grid;
-  gap: 24px;
-  align-content: start;
-  max-width: 1180px;
-  min-height: 100dvh;
-  margin: 0 auto;
-  padding: 28px 24px 64px;
+/* Título y acciones en una misma banda; envuelven debajo si no entran. */
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
 }
 
-.header {
+.headerTexto {
   display: grid;
   gap: 6px;
 }
 
-/* Tarjetas y paneles: --surface + borde 1px + radio 12–16px + --shadow. */
-.panel {
+/* Las dos altas: una primaria y una secundaria, nunca dos navy compitiendo. */
+.headerAcciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Los formularios ya no son tarjetas: la del Modal es la superficie, y estos
+   solo apilan sus campos dentro. Densidad cómoda: grids con gap 14–24px. */
+.formulario {
   display: grid;
   gap: 16px;
-  padding: 24px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-card);
-  background: var(--surface);
-  box-shadow: var(--shadow);
 }
 
-.panelTitle {
-  margin: 0;
-  font-size: var(--fs-body);
-  font-weight: 700;
-}
-
-/* Densidad cómoda: grids con gap 14–24px. */
+/* Una sola columna dentro del diálogo, que es angosto: las tres columnas que
+   tenían cuando ocupaban el ancho de la pantalla aquí dejarían campos de 120px. */
 .fields {
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   align-items: start;
 }
 
+.field,
 .campo {
   display: grid;
   gap: 6px;
@@ -89,7 +85,6 @@
 .topes {
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   align-items: start;
 }
 
@@ -113,10 +108,12 @@
   font-weight: 600;
 }
 
+/* Cancelar y envío contra el borde derecho del diálogo. */
 .acciones {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  justify-content: flex-end;
 }
 
 /* Error de acción: el rojo solo aparece aquí, nunca decorativo. */
@@ -130,6 +127,8 @@
   font-weight: 600;
 }
 
+/* Nueve columnas no entran en una pantalla angosta: la tarjeta se desplaza en
+   horizontal dentro de sí misma, y la página nunca. */
 .tabla {
   padding: 8px 24px 16px;
   border: 1px solid var(--border);
@@ -158,6 +157,22 @@
   display: grid;
   gap: 2px;
   font-size: var(--fs-body-sm);
+}
+
+/* Wide URLs must not push the row's actions off screen. */
+.direccion {
+  display: inline-block;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+/* La celda que no aplica a este recurso. Es una raya tenue y no un hueco: un
+   <td> vacío se lee igual que un dato que falta, y esto no falta. */
+.noAplica {
+  color: var(--muted);
 }
 
 .filaAcciones {

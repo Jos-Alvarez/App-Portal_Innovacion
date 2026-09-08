@@ -6,7 +6,8 @@ import { usePathname } from "next/navigation";
 import styles from "./topbar.module.css";
 
 /**
- * The panel's navigation: the six administration screens, in one place.
+ * The panel's navigation: the five day-to-day administration screens, in one
+ * place.
  *
  * ══════════════════════════════════════════════════════════════════════════
  *  WHY THIS EXISTS NOW AND NOT BEFORE
@@ -17,7 +18,8 @@ import styles from "./topbar.module.css";
  * screens were reachable only by typing their URL, which was tolerable while
  * they were being built and stopped being tolerable once the panel was
  * complete: an administrator had no way to discover that `/admin/asignaciones`
- * exists, and no way back to it after leaving.
+ * exists, and no way back to it after leaving. Those five are what remains here;
+ * the door item #17 opened now lives in the session menu.
  *
  * `topbar.tsx` recorded the trigger in writing: "If the bar ever grows a set of
  * entries rather than one, that is the moment to add `aria-current`." This is
@@ -40,9 +42,9 @@ import styles from "./topbar.module.css";
  *
  * `topbar.tsx` weighed a prop when there was one entry and rejected it: "a prop
  * every page has to pass correctly for a wart nobody has ever complained
- * about". With six entries the wart is gone but the objection is stronger — nine
- * call sites would each have to name their own route, and a page that names the
- * wrong one would highlight a screen the reader is not on.
+ * about". With a set of entries the wart is gone but the objection is stronger —
+ * nine call sites would each have to name their own route, and a page that names
+ * the wrong one would highlight a screen the reader is not on.
  *
  * `usePathname` cannot be passed wrong. It costs this one small client
  * component, which is why the nav is split out instead of turning the whole
@@ -54,24 +56,29 @@ import styles from "./topbar.module.css";
  */
 
 /**
- * The six screens of the panel, in the order the work tends to happen: build the
- * catalogue, hand it out, read what comes back, measure it.
+ * The four day-to-day screens of the panel, in the order the work tends to
+ * happen: build the catalogue, hand it out, read what comes back, measure it.
  *
- * ADMINISTRADORES IS LAST, AND THAT POSITION IS A REQUIREMENT RATHER THAN A
- * PREFERENCE. The PRD asks for its entry "junto al de cerrar sesión". The bar is
- * now two rows — the session cluster ends the logo's row on the sign-out
- * control, this nav takes the row underneath — so the LAST entry is the one that
- * lands closest to it, diagonally adjacent instead of side by side. Sorting this
- * list alphabetically, or by any other rule that moved it, would quietly break a
- * line of the PRD that item #17 implemented on purpose.
+ * ADMINISTRADORES IS NOT HERE, AND ITS ABSENCE IS DELIBERATE. It used to close
+ * this list, because the PRD asks for its entry "junto al de cerrar sesión" and
+ * the last entry was the one nearest that control. It has since moved INTO the
+ * session menu, where it sits in the same small panel as the way out — which is
+ * as literal as that line has ever been satisfied. `session-menu.tsx` owns it
+ * now, `RUTA_ADMINISTRADORES` included.
+ *
+ * The two lists are not interchangeable. This one is the work you do with the
+ * catalogue and it is the same for every administrator; the other is who holds
+ * the keys, which is why it belongs beside the reader's own name rather than
+ * among the screens they visit all day.
  */
 export const ENLACES_ADMIN = [
-  { href: "/admin/enlaces", etiqueta: "Enlaces" },
-  { href: "/admin/procesadores", etiqueta: "Procesadores" },
+  /* Enlaces y Procesadores eran dos entradas y ahora son una: la separación
+     era la de las dos tablas, no la de la pregunta que se hace quien mira
+     — «qué ofrece el portal» —. `app/admin/catalogo/page.tsx` lo explica. */
+  { href: "/admin/catalogo", etiqueta: "Catálogo" },
   { href: "/admin/asignaciones", etiqueta: "Asignaciones" },
   { href: "/admin/sugerencias", etiqueta: "Sugerencias" },
   { href: "/admin/analitica", etiqueta: "Analítica" },
-  { href: "/admin/administradores", etiqueta: "Administradores" },
 ] as const;
 
 /** Whether a bar entry is the screen being read, `/admin/asignaciones/7` included. */

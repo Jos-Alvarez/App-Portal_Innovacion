@@ -6,7 +6,7 @@ import type { ActualizarProcesador, CrearProcesador } from "@/lib/procesadores/s
  * The browser's side of `/api/procesadores` — one function per administrative
  * action, and one shape for every answer.
  *
- * Same contract as `app/admin/enlaces/enlaces-client.ts`, and for the same
+ * Same contract as `app/admin/catalogo/enlaces-client.ts`, and for the same
  * reasons: every action has the three outcomes (saved, refused, unreachable)
  * and the same unwrapping to do, so writing it once leaves the screen holding
  * only the decision of WHAT to send.

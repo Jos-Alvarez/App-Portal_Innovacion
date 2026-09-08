@@ -1,0 +1,74 @@
+/*
+ * DESIGN.md "Superficies y elevación": overlay `rgba(8,16,32,.45)` — ya vive en
+ * globals como `--overlay` —, tarjeta de 16px de radio y animación `lx-pop`
+ * (fade + 8px up, ~.25s), la misma que el Toast ya reusa.
+ */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--overlay);
+  /* Una tarjeta más alta que la ventana se desplaza dentro del overlay, no
+     detrás de él: el fondo está bloqueado mientras el diálogo está abierto. */
+  overflow-y: auto;
+  animation: lx-overlay-in 0.25s ease-out;
+}
+
+.tarjeta {
+  display: grid;
+  gap: 20px;
+  width: min(520px, 100%);
+  padding: 28px;
+  /* El único radio de 16px del sistema: DESIGN.md lo reserva para el modal. */
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  animation: lx-pop 0.25s ease-out;
+}
+
+/* Destino del foco cuando el contenido todavía no ofrece ninguno. */
+.tarjeta:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+/* La misma escala que el panel al que reemplaza: el sistema no define un h2
+   propio, e inventarle uno aquí sería una excepción de una sola pantalla. */
+.titulo {
+  margin: 0;
+  font-size: var(--fs-body);
+  font-weight: 700;
+}
+
+@keyframes lx-overlay-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes lx-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .tarjeta {
+    animation: none;
+  }
+}

@@ -99,9 +99,13 @@ describe("<EnlaceForm />", () => {
     expect(onCancelar).toHaveBeenCalledTimes(1);
   });
 
-  it("offers nothing to cancel when there is no edit in progress", () => {
-    renderForm();
+  it("lets an alta opened by mistake be abandoned too", async () => {
+    /* El panel se abre bajo demanda desde la pantalla, asi que cerrarlo es una
+       salida que el alta necesita tanto como la edicion. */
+    const user = renderForm();
 
-    expect(screen.queryByRole("button", { name: /cancelar/i })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /cancelar/i }));
+
+    expect(onCancelar).toHaveBeenCalledTimes(1);
   });
 });

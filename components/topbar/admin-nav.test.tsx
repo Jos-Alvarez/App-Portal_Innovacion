@@ -6,10 +6,12 @@ const usePathname = vi.fn();
 vi.mock("next/navigation", () => ({ usePathname: () => usePathname() }));
 
 import { AdminNav, ENLACES_ADMIN, esRutaActual } from "./admin-nav";
+import { RUTA_ADMINISTRADORES } from "./session-menu";
 
 /**
- * La navegación del panel: las seis pantallas de `/admin/*` y cuál de ellas se
- * está leyendo.
+ * La navegación del panel: las cinco pantallas de todos los días de `/admin/*` y
+ * cuál de ellas se está leyendo. La sexta — Administradores — se mudó al menú de
+ * sesión y la cubre `session-menu.test.tsx`.
  *
  * WHAT IS NOT TESTED HERE. Whether these screens are REACHABLE — that is
  * `lib/authz`'s and each page's own guard, and this bar decides nothing about
@@ -18,12 +20,12 @@ import { AdminNav, ENLACES_ADMIN, esRutaActual } from "./admin-nav";
  */
 
 beforeEach(() => {
-  usePathname.mockReset().mockReturnValue("/admin/enlaces");
+  usePathname.mockReset().mockReturnValue("/admin/catalogo");
 });
 
 describe("esRutaActual", () => {
   it("reconoce la ruta exacta", () => {
-    expect(esRutaActual("/admin/enlaces", "/admin/enlaces")).toBe(true);
+    expect(esRutaActual("/admin/catalogo", "/admin/catalogo")).toBe(true);
   });
 
   /*
@@ -37,20 +39,20 @@ describe("esRutaActual", () => {
 
   /*
    * El corte tiene que ser en la barra y no en el texto: si no,
-   * `/admin/enlaces-viejos` — o cualquier ruta futura que empiece igual —
-   * resaltaría Enlaces.
+   * `/admin/catalogo-viejo` — o cualquier ruta futura que empiece igual —
+   * resaltaría Catálogo.
    */
   it("no confunde una ruta que solo empieza parecido", () => {
-    expect(esRutaActual("/admin/enlaces", "/admin/enlaces-viejos")).toBe(false);
+    expect(esRutaActual("/admin/catalogo", "/admin/catalogo-viejo")).toBe(false);
   });
 
   it("no resalta nada fuera del panel", () => {
-    expect(esRutaActual("/admin/enlaces", "/")).toBe(false);
+    expect(esRutaActual("/admin/catalogo", "/")).toBe(false);
   });
 
   /* `usePathname` puede no tener valor todavía; eso no es una ruta. */
   it("tolera no saber en qué ruta está", () => {
-    expect(esRutaActual("/admin/enlaces", null)).toBe(false);
+    expect(esRutaActual("/admin/catalogo", null)).toBe(false);
   });
 });
 
@@ -59,7 +61,8 @@ describe("<AdminNav />", () => {
     render(<AdminNav />);
 
     expect(screen.getAllByRole("link")).toHaveLength(ENLACES_ADMIN.length);
-    expect(ENLACES_ADMIN).toHaveLength(6);
+    /* Enlaces y Procesadores se fundieron en Catálogo: cuatro, no cinco. */
+    expect(ENLACES_ADMIN).toHaveLength(4);
   });
 
   it("apunta cada entrada a su ruta", () => {
@@ -78,7 +81,7 @@ describe("<AdminNav />", () => {
 
     expect(screen.getByRole("link", { name: "Analítica" })).toHaveAttribute("aria-current", "page");
 
-    for (const etiqueta of ["Enlaces", "Procesadores", "Asignaciones", "Sugerencias"]) {
+    for (const etiqueta of ["Catálogo", "Asignaciones", "Sugerencias"]) {
       expect(screen.getByRole("link", { name: etiqueta })).not.toHaveAttribute("aria-current");
     }
   });
@@ -112,12 +115,19 @@ describe("<AdminNav />", () => {
   });
 
   /*
-   * El PRD pide la entrada de Administradores "junto al de cerrar sesión", y la
-   * nav va justo antes de ese botón: la última entrada es la que queda al lado.
-   * Ordenar esta lista alfabéticamente rompería esa línea del PRD en silencio.
+   * El PRD pide la entrada de Administradores "junto al de cerrar sesión", y esa
+   * entrada ya no está acá: vive en el menú de sesión, en el mismo panel que la
+   * salida. Devolverla a esta lista rompería esa línea del PRD en silencio.
+   *
+   * Las rutas se ensanchan a `string` a propósito. Con `as const`, TypeScript ya
+   * demuestra que la ruta no está en la lista y rechaza la comparación por no
+   * tener overlap — es decir, la garantía es de tipos y esto es su red debajo:
+   * si alguien saca el `as const`, la prueba sigue diciendo la verdad.
    */
-  it("deja Administradores al final de la lista", () => {
-    expect(ENLACES_ADMIN.at(-1)?.href).toBe("/admin/administradores");
+  it("no lleva Administradores, que se mudó al menú de sesión", () => {
+    const rutas: readonly string[] = ENLACES_ADMIN.map(({ href }) => href);
+
+    expect(rutas).not.toContain(RUTA_ADMINISTRADORES);
   });
 
   /* Prefijos disjuntos: ninguna ruta puede resaltar dos entradas a la vez. */

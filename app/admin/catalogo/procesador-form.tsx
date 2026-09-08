@@ -25,11 +25,15 @@ import {
 } from "@/lib/procesadores/schema";
 
 import { aEntero, bytesAMegabytes, cambiosDelProcesador, megabytesABytes } from "./edicion";
-import { ETIQUETA_SALIDA } from "./etiquetas";
-import styles from "./procesadores.module.css";
+import { ETIQUETA_SALIDA } from "./etiquetas-procesadores";
+import styles from "./catalogo.module.css";
 
 /**
- * The alta and the edición of one procesador, as one inline panel.
+ * The alta and the edición of one procesador — shown inside the screen's Modal.
+ *
+ * IT DOES NOT DRESS ITSELF AS A CARD, and it carries no heading: the Modal is
+ * the surface and owns the title, which is also what `aria-labelledby` points
+ * at. A second border and a second `<h2>` inside it would be a card over a card.
  *
  * THE SCHEMAS ARE THE VALIDATION, NOT A COPY OF THEM, and the pipeline below is
  * the route handlers' own, run one round trip earlier:
@@ -113,7 +117,7 @@ export interface ProcesadorFormProps {
    * fields that moved for an edición.
    */
   onSubmit: (datos: CrearProcesador | ActualizarProcesador) => void;
-  /** Leaves the edit without applying it. */
+  /** Closes the dialog without applying it — an alta and an edición alike. */
   onCancelar: () => void;
 }
 
@@ -272,11 +276,7 @@ export function ProcesadorForm({
   const errorGeneral = error !== null && !conCampoVisible ? error.mensaje : null;
 
   return (
-    <form className={styles.panel} onSubmit={enviar} noValidate>
-      <h2 className={styles.panelTitle}>
-        {editando ? "Editar procesador" : "Nuevo procesador"}
-      </h2>
-
+    <form className={styles.formulario} onSubmit={enviar} noValidate>
       <div className={styles.fields}>
         <Input
           label="Nombre"
@@ -417,15 +417,18 @@ export function ProcesadorForm({
         </p>
       ) : null}
 
+      {/* Cancelar primero y el envío al final, contra el borde derecho: es el
+          orden en que se leen las dos salidas de un diálogo, y la que aplica
+          algo queda donde termina el recorrido. Cancelar está también en el
+          alta: el formulario ya no vive abierto, así que abrirlo por error
+          necesita una salida propia. */}
       <div className={styles.acciones}>
+        <Button variant="secondary" disabled={enviando} onClick={onCancelar}>
+          Cancelar
+        </Button>
         <Button type="submit" variant="primary" disabled={enviando}>
           {editando ? "Guardar cambios" : "Agregar procesador"}
         </Button>
-        {editando ? (
-          <Button variant="secondary" disabled={enviando} onClick={onCancelar}>
-            Cancelar
-          </Button>
-        ) : null}
       </div>
     </form>
   );
