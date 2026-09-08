@@ -86,7 +86,7 @@ export default async function ProcesadorPage({ params }: Props) {
   }
 
   return (
-    <main className={styles.main}>
+    <main className="lx-main">
       {/* The shared bar item #17 extracted: identity, theme, the role screen for
           an administrator, and the way out. */}
       <Topbar usuario={acceso.usuario} />

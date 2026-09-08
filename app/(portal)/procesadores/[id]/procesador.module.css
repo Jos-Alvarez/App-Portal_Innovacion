@@ -6,16 +6,6 @@
  * processor errors.
  */
 
-.main {
-  display: grid;
-  gap: 24px;
-  align-content: start;
-  max-width: 1100px;
-  min-height: 100dvh;
-  margin: 0 auto;
-  padding: 20px 24px 64px;
-}
-
 /*
  * The way back, above the title rather than beside it: this screen is reached
  * from the dashboard and DESIGN.md's Sin permiso state offers the same exit, so

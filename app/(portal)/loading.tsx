@@ -1,7 +1,5 @@
 import { Skeleton } from "@/components/states/skeleton";
 
-import styles from "./portal.module.css";
-
 /**
  * Carga — DESIGN.md: "skeleton shimmer con la geometría del contenido real;
  * nunca pantalla en blanco".
@@ -19,7 +17,7 @@ import styles from "./portal.module.css";
  */
 export default function CargandoPortal() {
   return (
-    <main className={styles.main}>
+    <main className="lx-main">
       <Skeleton
         label="Cargando tus recursos asignados"
         blocks={[

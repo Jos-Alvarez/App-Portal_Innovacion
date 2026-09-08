@@ -2,8 +2,6 @@
 
 import { ErrorState } from "@/components/states/error-state";
 
-import styles from "./sugerencias.module.css";
-
 /**
  * Error — DESIGN.md: "círculo rojo '!', lenguaje claro sin códigos, botón
  * Reintentar".
@@ -15,7 +13,7 @@ import styles from "./sugerencias.module.css";
  */
 export default function ErrorSugerenciasAdmin({ reset }: { error: Error; reset: () => void }) {
   return (
-    <main className={styles.main}>
+    <main className="lx-main">
       <ErrorState
         title="No pudimos cargar las sugerencias"
         description="Hubo un problema al leer el buzón. Intenta de nuevo; si sigue ocurriendo, avisa al equipo de sistemas."

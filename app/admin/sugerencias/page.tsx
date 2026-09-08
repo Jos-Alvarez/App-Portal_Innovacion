@@ -9,7 +9,7 @@ import styles from "./sugerencias.module.css";
 /**
  * `/admin/sugerencias` — la gestión de sugerencias, backlog item #15.
  *
- * WHY `/admin/sugerencias`. The literal `admin` prefix `app/admin/enlaces`
+ * WHY `/admin/sugerencias`. The literal `admin` prefix `app/admin/catalogo`
  * established, and the same reason applies with more force here: `/sugerencias`
  * is already taken by the collaborator's own box. Two screens over the same rows,
  * two audiences, two URLs a person can tell apart in the address bar.
@@ -51,7 +51,7 @@ export default async function SugerenciasAdminPage() {
   const sugerencias = await listarSugerencias(prisma);
 
   return (
-    <main className={styles.main}>
+    <main className="lx-main">
       {/* La misma barra que el portal: identidad, tema, la puerta al rol y la
           salida. El logo vuelve al portal, que hasta ahora era el único camino
           que estas pantallas no tenían. */}

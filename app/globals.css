@@ -139,6 +139,37 @@ body {
   padding: 0;
 }
 
+/*
+ * Reserva el canal de la barra de desplazamiento SIEMPRE, haya o no algo que
+ * desplazar.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  POR QUÉ SE MOVÍA LA BARRA SUPERIOR AL CAMBIAR DE PANTALLA
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * `.lx-main` mide `min-height: 100dvh` y se centra con `margin: 0 auto`, así que
+ * una pantalla corta — Mis recursos, Analítica — ocupa exactamente el alto del
+ * viewport y no desborda: el navegador no dibuja barra. Una larga — Enlaces con
+ * su formulario y su tabla — sí desborda, y la barra clásica de Windows se lleva
+ * unos 15px de ANCHO del viewport.
+ *
+ * Un contenedor centrado dentro de un viewport 15px más angosto se corre 7.5px.
+ * No se mueven los botones: se mueve el marco que los contiene, y con él el logo,
+ * la nav y el nombre. De ahí el salto lateral chico al ir de una pantalla a otra.
+ *
+ * `stable` reserva el canal en las dos clases de pantalla, así que el ancho útil
+ * deja de depender de cuánto contenido tenga la página. El costo es una franja
+ * vacía de ~15px en las pantallas cortas; la alternativa es que toda la
+ * interfaz se sacuda en cada navegación, que es lo que se estaba viendo.
+ *
+ * Sin `both-edges` a propósito: eso reservaría el canal de los DOS lados y
+ * costaría 30px de ancho para corregir un descentrado de 7.5px que nadie percibe
+ * — y que, sobre todo, ya no cambia.
+ */
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   background: var(--bg);
   color: var(--text);
@@ -184,6 +215,43 @@ a {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/*
+ * The page shell every screen sits in: one column, centred, with the same
+ * measure and the same breathing room above the fold.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  WHY IT IS ONE CLASS AND NOT NINE
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * Nine stylesheets each carried a byte-identical `.main` block — and then two of
+ * them stopped being identical. Procesadores and Analítica had drifted to
+ * 1180px while the other seven stayed at 1100px, and the admin screens used a
+ * 28px top padding against the portal's 20px. Nothing chose those numbers: they
+ * were copied, edited once, and never reconciled.
+ *
+ * The reader pays for that on every click. Moving from Enlaces to Procesadores
+ * along the panel nav shifts the whole page 80px wider and slides the title
+ * sideways, which reads as the interface being rebuilt rather than as one
+ * screen replacing another. A shell is the last thing that should move.
+ *
+ * 1180px is the widest of the two, kept because the tables are what needed the
+ * room; 28px is the more common top padding of the two. One value each, in one
+ * place, so the next screen inherits them instead of copying them.
+ *
+ * `min-height: 100dvh` keeps a short page's background reaching the bottom of
+ * the viewport, and `align-content: start` keeps its content from being
+ * centred inside that height.
+ */
+.lx-main {
+  display: grid;
+  gap: 24px;
+  align-content: start;
+  max-width: 1180px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 28px 24px 64px;
 }
 
 /*
@@ -257,47 +325,93 @@ a {
 }
 
 /*
- * Icon-only button — the topbar's theme toggle and its way out.
+ * An entry in a dropdown menu — today the theme switch and the way out, both of
+ * which live inside the topbar's session menu.
  *
- * DERIVED from the secondary treatment rather than invented: same border token,
- * same transparent rest state, same --navy-fg on hover. What changes is that the
- * label is gone, so the shape becomes a circle sized by `--tap` instead of a
- * rectangle sized by its text.
+ * IT REPLACED `.lx-icon-btn`. That class existed because the two controls sat
+ * loose in the topbar with no room for their labels, so they were drawn as bare
+ * circles carrying an `aria-label` and nothing else. Behind a trigger there IS
+ * room, so the labels came back and the circles went away; nothing else in the
+ * portal ever used the class, so it left with them.
  *
- * 34px is the smallest square that still clears the pointer target these two
- * controls need; below that the theme toggle becomes hard to hit on a laptop
- * trackpad, and signing out by accident is not a mistake worth designing in.
+ * DERIVED from the row-hover language the tables already use rather than
+ * invented: transparent at rest, `--surface2` under the pointer. It is a full
+ * bleed row and not a pill because inside a panel the hover should reach the
+ * panel's own padding, which is what tells the reader where the target ends.
+ *
+ * 38px of height rather than the 34px the circles had: a row is easier to hit
+ * than a disc, and signing out by accident is still not a mistake worth
+ * designing in.
  *
  * DECLARED AFTER THE VARIANTS ON PURPOSE. It carries the same specificity as
  * `.lx-btn-text`, so it has to come last to win the padding it overrides.
  */
-.lx-icon-btn {
-  display: inline-flex;
+.lx-menu-item {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  flex: none;
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 999px;
+  gap: 10px;
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--radius-control);
   background: transparent;
-  color: var(--muted);
+  color: var(--text);
   font: inherit;
+  font-size: var(--fs-body-sm);
+  font-weight: 600;
   line-height: 1;
+  text-align: left;
+  /* An entry may be a <button> or a <Link>; the anchor would arrive underlined. */
+  text-decoration: none;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.lx-icon-btn:hover:not(:disabled) {
-  border-color: var(--cyan);
+/*
+ * An inline mark at the head of the row — the sign-out door. Flex would shrink
+ * an SVG before it wraps the label beside it, which turns the icon into an oval.
+ */
+.lx-menu-item > svg {
+  flex: none;
+}
+
+.lx-menu-item:hover:not(:disabled) {
+  background: var(--surface2);
+  color: var(--navy-fg);
+}
+
+/*
+ * The entry that IS the screen being read — today the administrator door in the
+ * session menu, marked by `data-actual`.
+ *
+ * The same --cyan-soft / --navy-fg pair the topbar nav uses for its current
+ * entry, because it answers the same question and the portal should not invent a
+ * second language for "where am I". A menu that does not say costs the reader an
+ * open, a look and a close to find out.
+ *
+ * `:hover` is listed rather than left to source order: on its own the attribute
+ * selector only ties with `.lx-menu-item:hover`, and a tie is decided by which
+ * file the bundler happened to emit last.
+ */
+.lx-menu-item[data-actual="true"],
+.lx-menu-item[data-actual="true"]:hover {
   background: var(--cyan-soft);
   color: var(--navy-fg);
 }
 
-.lx-icon-btn:focus-visible {
+/*
+ * Keyboard focus inside a menu is not `:focus-visible`. The items are moved
+ * through with the arrow keys, which focus them programmatically, and a
+ * programmatic focus does not always match that selector. A menu whose keyboard
+ * position is invisible is a menu nobody can use without a mouse, so this is
+ * plain `:focus` on purpose.
+ */
+.lx-menu-item:focus {
   outline: 2px solid var(--cyan);
-  outline-offset: 2px;
+  outline-offset: -2px;
+  background: var(--surface2);
+  color: var(--navy-fg);
 }
 
 /*

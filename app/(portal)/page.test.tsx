@@ -124,13 +124,16 @@ describe("/ (dashboard del colaborador)", () => {
   });
 
   it("mantiene el cambio de tema al alcance del colaborador", async () => {
-    /* Hasta que exista una topbar propia, esta pantalla es el único sitio del
-       portal donde se monta el toggle: quitarlo dejaría al producto sin forma
-       de cambiar de tema. */
+    /* El toggle vive detrás del menú de sesión de la topbar. Lo que esta pantalla
+       garantiza es que ese menú esté montado: sin él, el colaborador se queda sin
+       forma de cambiar de tema. `session-menu.test.tsx` cubre su interior. */
     guardPage.mockResolvedValue({ allowed: true, usuario: USUARIO });
 
     render(await PortalPage());
 
-    expect(screen.getByRole("button", { name: /cambiar a modo/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ana Quispe" })).toHaveAttribute(
+      "aria-haspopup",
+      "menu",
+    );
   });
 });

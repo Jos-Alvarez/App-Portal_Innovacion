@@ -6,7 +6,7 @@ import type { SugerenciaAdminDTO } from "@/lib/sugerencias/repository";
  * rather than as JSX.
  *
  * It lives in its own module, beside the screen and not inside it, for the reason
- * `app/admin/procesadores/edicion.ts` does: this is the one part of the grouping
+ * `app/admin/catalogo/edicion.ts` does: this is the one part of the grouping
  * feature that is a decision rather than a rendering, and a decision is worth
  * testing without mounting anything.
  */

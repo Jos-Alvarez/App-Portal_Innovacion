@@ -141,7 +141,7 @@ export async function obtenerSugerencias(ruta: string): Promise<readonly Sugeren
  * The send, as the screen sees it: either the registered suggestion or a
  * sentence to show.
  *
- * The same discriminated shape `app/admin/enlaces/enlaces-client.ts` uses, and
+ * The same discriminated shape `app/admin/catalogo/enlaces-client.ts` uses, and
  * for the same reason — a caller cannot read the result without deciding which
  * case it is in, so "assume it worked" is not something that can be written by
  * accident.

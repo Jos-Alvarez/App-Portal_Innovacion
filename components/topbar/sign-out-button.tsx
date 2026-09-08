@@ -3,13 +3,15 @@
 import { signOut } from "next-auth/react";
 
 /**
- * The portal's single sign-out action — backlog item #17.
+ * The portal's single sign-out action — backlog item #17, now an entry in the
+ * topbar's session menu.
  *
- * It is the anchor of this whole item: the PRD places the administrator door
- * "junto al de cerrar sesión", and until now the portal had no such button at
- * all. Item #8 wrote down why it never appeared — the topbar lockup was copied
- * into each screen rather than extracted — and predicted this file's neighbour:
- * "item #17 adds a second button beside the theme toggle and will need it".
+ * It is the anchor of that whole item: the PRD places the administrator door
+ * "junto al de cerrar sesión", and until item #17 the portal had no such control
+ * at all. Item #8 wrote down why it never appeared — the topbar lockup was
+ * copied into each screen rather than extracted — and predicted this file's
+ * neighbour: "item #17 adds a second button beside the theme toggle and will
+ * need it".
  *
  * `signOut` from `next-auth/react` and not a link to `/api/auth/signout`, for
  * the same reason `SignInButton` uses `signIn`: the endpoint is a POST protected
@@ -23,36 +25,43 @@ import { signOut } from "next-auth/react";
  * screen, with a flash of the gate in between.
  *
  * ══════════════════════════════════════════════════════════════════════════
- *  WHY IT IS AN ICON, AND WHY IT NO LONGER USES <Button />
+ *  IT GOT ITS LABEL BACK, AND IT IS NO LONGER A BUTTON TO ARIA
  * ══════════════════════════════════════════════════════════════════════════
  *
- * The way out moved up beside the reader's name, where the six-entry nav below
- * it already spends the bar's whole word budget. As a text button it read as a
- * seventh destination in that set; as a mark beside the name it reads as what it
- * is — something you do to your own session.
+ * For one release this was a bare door glyph carrying an `aria-label`, because
+ * loose in the topbar the words read as a seventh entry in the panel nav beside
+ * it. Behind a trigger there is room for them, so they came back, and the
+ * `aria-label` came off: two names for one control is one more than it needs,
+ * and the visible words are now the accessible ones.
  *
- * `<Button />` chooses between the three fills DESIGN.md defines, all of which
- * size themselves by their label. There is no label to size by here, so this
- * wears the shared `.lx-icon-btn` treatment directly rather than fighting a
- * variant's padding with an override.
+ * `role="menuitem"` rather than the implicit button role, because a menu that
+ * announces "button" for its entries is a menu whose shape does not match what
+ * it says it is. It stays a real `<button>` underneath — that is what makes
+ * Enter, Space and the pointer work without reimplementing any of them.
  *
- * The accessible name is unchanged and is now the ONLY name: `aria-label`
- * carries the two words the button used to paint, and the glyph is hidden from
- * assistive technology so it is not announced twice.
+ * NOTHING CLOSES THE MENU HERE. `signOut` navigates away, so a close would be a
+ * frame of housekeeping nobody sees; and were it to fail, leaving the menu open
+ * is the honest outcome — the reader is still signed in and still looking at the
+ * control that says so.
  */
 export function SignOutButton() {
   return (
     <button
       type="button"
-      className="lx-icon-btn"
+      role="menuitem"
+      /*
+       * Menu entries are reached with the arrow keys, never with Tab: the
+       * trigger is the menu's single tab stop. `SessionMenu` moves focus here.
+       */
+      tabIndex={-1}
+      className="lx-menu-item"
       onClick={() => void signOut({ redirectTo: "/login" })}
-      aria-label="Cerrar sesión"
     >
       {/*
        * A door with an arrow leaving it — drawn inline rather than pulled from an
        * icon font, because `currentColor` is what lets it inherit the hover and
-       * dark-mode colours the button already resolves, and because the portal
-       * ships no icon dependency to add one to.
+       * dark-mode colours the row already resolves, and because the portal ships
+       * no icon dependency to add one to.
        */}
       <svg
         width="17"
@@ -70,6 +79,7 @@ export function SignOutButton() {
         <path d="m16 17 5-5-5-5" />
         <path d="M21 12H9" />
       </svg>
+      Cerrar sesión
     </button>
   );
 }

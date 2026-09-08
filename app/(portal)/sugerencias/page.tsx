@@ -74,7 +74,7 @@ export default async function SugerenciasPage() {
   ]);
 
   return (
-    <main className={styles.main}>
+    <main className="lx-main">
       {/* The shared bar item #17 extracted: identity, theme, the role screen for
           an administrator, and the way out. No `preloadLogo` — the reader
           arrived here from another screen that already loaded the asset. */}

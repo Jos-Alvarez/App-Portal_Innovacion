@@ -58,7 +58,7 @@ export default async function AsignacionesPage() {
   const usuarios = await listarUsuarios(prisma);
 
   return (
-    <main className={styles.main}>
+    <main className="lx-main">
       {/* La misma barra que el portal: identidad, tema, la puerta al rol y la
           salida. El logo vuelve al portal, que hasta ahora era el único camino
           que estas pantallas no tenían. */}

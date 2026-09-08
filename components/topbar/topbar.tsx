@@ -1,9 +1,8 @@
 import Link from "next/link";
 
 import { LOGO_SIZE_TOPBAR, Logo } from "@/components/logo/logo";
-import { ThemeToggle } from "@/components/theme-toggle/theme-toggle";
 import { AdminNav } from "@/components/topbar/admin-nav";
-import { SignOutButton } from "@/components/topbar/sign-out-button";
+import { SessionMenu } from "@/components/topbar/session-menu";
 
 import styles from "./topbar.module.css";
 
@@ -49,20 +48,43 @@ import styles from "./topbar.module.css";
  * written once: the repetition is the mechanism, not an oversight.
  *
  * ══════════════════════════════════════════════════════════════════════════
- *  THE ONE DOOR BECAME SIX, AND WITH THEM `aria-current`
+ *  THE ONE DOOR BECAME A SET, AND WITH IT `aria-current`
  * ══════════════════════════════════════════════════════════════════════════
  *
  * Item #17 shipped a single entry and wrote down the condition for changing it:
  * "If the bar ever grows a set of entries rather than one, that is the moment to
- * add `aria-current`." Item #19 completed the panel and left five of its six
- * screens reachable only by typing a URL, so the set exists and the attribute
- * came with it — in `admin-nav.tsx`, which is a client component precisely so it
- * can read the current route itself instead of taking it from nine call sites
- * that could each pass it wrong.
+ * add `aria-current`." Item #19 completed the panel and left most of its screens
+ * reachable only by typing a URL, so the set exists and the attribute came with
+ * it — in `admin-nav.tsx`, which is a client component precisely so it can read
+ * the current route itself instead of taking it from nine call sites that could
+ * each pass it wrong.
  *
- * The PRD's placement survives the change: the nav sits immediately before the
- * sign-out button and Administradores is its last entry, so that entry is still
- * "junto al de cerrar sesión".
+ * ══════════════════════════════════════════════════════════════════════════
+ *  BACK TO ONE ROW
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * For one release the nav took a declared second row of its own so that a
+ * narrow viewport could never push the reader's name off the logo's line. It
+ * cost the bar most of its height and stacked two competing left edges, and the
+ * reference design does it in one row: lockup, then the panel's entries, then
+ * the session cluster against the far edge.
+ *
+ * So the nav moved up beside the lockup and the second row became what it should
+ * always have been — a fallback the viewport triggers, not a layout the
+ * stylesheet declares. The entries also dropped their borders; `topbar.module.css`
+ * says why.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  WHERE THE ADMINISTRATOR DOOR WENT
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * It is no longer in this bar at all. `AdminNav` holds the five screens an
+ * administrator works with all day; `/admin/administradores` — who holds the
+ * keys — moved into the session menu, where it shares one small panel with the
+ * way out. The PRD asks for that entry "junto al de cerrar sesión", and three
+ * rows apart in one menu is the closest the two have ever been.
+ *
+ * `session-menu.tsx` owns the route constant and the reasoning.
  */
 
 export interface TopbarProps {
@@ -77,13 +99,6 @@ export interface TopbarProps {
    */
   preloadLogo?: boolean;
 }
-
-/**
- * Where the administrator door leads. Kept as an export because the PRD names
- * this screen specifically and the tests assert its placement; the nav owns the
- * full list.
- */
-export const RUTA_ADMINISTRADORES = "/admin/administradores";
 
 export function Topbar({ usuario, preloadLogo = false }: TopbarProps) {
   return (
@@ -103,34 +118,24 @@ export function Topbar({ usuario, preloadLogo = false }: TopbarProps) {
       </Link>
 
       {/*
-       * The session cluster: what you can do to your own session, and who the
-       * portal thinks you are — pinned to the far end of the logo's own row.
+       * The five day-to-day screens of the panel, drawn only for administrators.
+       * The sixth — Administradores — is not here; it is in the session menu.
+       */}
+      {usuario.esAdmin ? <AdminNav /> : null}
+
+      {/*
+       * The session cluster, now a single trigger: who the portal thinks you are,
+       * with the administrator door, the theme switch and the way out behind it.
+       * Pinned to the far end of the row, whether or not the nav before it was
+       * drawn.
        *
-       * The two controls sit to the LEFT of the name and carry no words. Below
-       * them the panel nav spends six labels in a row, and a labelled toggle and
-       * a text sign-out read as two more entries in that set rather than as
-       * something outside it. Dropping to marks separates the two jobs by shape,
-       * which is cheaper than separating them by distance in a bar this full.
+       * `esAdmin` decides what the menu DRAWS and nothing else — the same rule
+       * that governs the nav above.
        *
        * The name is the guard's, re-read from SQL Server on this request, not one
        * carried in the session token.
        */}
-      <div className={styles.sesion}>
-        <ThemeToggle />
-        <SignOutButton />
-        <span className="lx-meta">{usuario.nombre}</span>
-      </div>
-
-      {/*
-       * PRD: "El acceso a esta pantalla se ofrece desde un botón ubicado junto
-       * al de cerrar sesión, visible solo para administradores". Drawn only for
-       * administrators, and Administradores is still its last entry — the one
-       * closest to the sign-out control the cluster above ends with.
-       *
-       * It takes the second row on its own (`flex-basis: 100%`), which is what
-       * keeps the name and the two marks on the logo's line at every width.
-       */}
-      {usuario.esAdmin ? <AdminNav /> : null}
+      <SessionMenu nombre={usuario.nombre} esAdmin={usuario.esAdmin} />
     </div>
   );
 }

@@ -2,8 +2,6 @@
 
 import { ErrorState } from "@/components/states/error-state";
 
-import styles from "./asignaciones.module.css";
-
 /**
  * Error — DESIGN.md: "círculo rojo '!', lenguaje claro sin códigos, botón
  * Reintentar".
@@ -18,7 +16,7 @@ import styles from "./asignaciones.module.css";
  */
 export default function ErrorAsignaciones({ reset }: { error: Error; reset: () => void }) {
   return (
-    <main className={styles.main}>
+    <main className="lx-main">
       <ErrorState
         title="No pudimos cargar las asignaciones"
         description="Hubo un problema al leer las personas o sus accesos. Intenta de nuevo; si sigue ocurriendo, avisa al Área de Innovación."

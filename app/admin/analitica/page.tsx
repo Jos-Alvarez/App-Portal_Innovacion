@@ -88,7 +88,7 @@ export default async function AnaliticaPage() {
   const reporteInicial = await calcularAnalitica(consultaInicial(), ahora, dependenciasDe(prisma));
 
   return (
-    <main className={styles.main}>
+    <main className="lx-main">
       <Topbar usuario={acceso.usuario} />
 
       <header className={styles.header}>

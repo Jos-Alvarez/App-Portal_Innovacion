@@ -1,7 +1,5 @@
 import { Skeleton } from "@/components/states/skeleton";
 
-import styles from "./sugerencias.module.css";
-
 /**
  * Carga — DESIGN.md: "skeleton shimmer con la geometría del contenido real;
  * nunca pantalla en blanco".
@@ -13,7 +11,7 @@ import styles from "./sugerencias.module.css";
  */
 export default function CargandoSugerenciasAdmin() {
   return (
-    <main className={styles.main}>
+    <main className="lx-main">
       <Skeleton
         label="Cargando las sugerencias"
         blocks={[

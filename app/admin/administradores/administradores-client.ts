@@ -6,7 +6,7 @@ import type { AdministradorDTO } from "@/lib/admins/repository";
  * The browser's side of `/api/admins` — one function per request the screen
  * makes, and one shape for every answer.
  *
- * Same contract as `app/admin/enlaces/enlaces-client.ts` and its siblings: every
+ * Same contract as `app/admin/catalogo/enlaces-client.ts` and its siblings: every
  * action has the three outcomes (done, refused, unreachable) and the same
  * unwrapping to do, so writing it once leaves the screen holding only the
  * decision of WHAT to send. No message is written here that the API could have

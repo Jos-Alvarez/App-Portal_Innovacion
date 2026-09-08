@@ -1,7 +1,5 @@
 import { Skeleton } from "@/components/states/skeleton";
 
-import styles from "../asignaciones.module.css";
-
 /**
  * Carga — DESIGN.md: "skeleton shimmer con la geometría del contenido real".
  *
@@ -11,7 +9,7 @@ import styles from "../asignaciones.module.css";
  */
 export default function CargandoAsignacionesDeUsuario() {
   return (
-    <main className={styles.main}>
+    <main className="lx-main">
       <Skeleton
         label="Cargando los accesos de esta persona"
         blocks={[

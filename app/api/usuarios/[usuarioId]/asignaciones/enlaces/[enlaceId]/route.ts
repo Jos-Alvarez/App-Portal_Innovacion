@@ -18,7 +18,7 @@ import { asignarRecursoAUsuario, revocarRecursoDeUsuario } from "@/lib/asignacio
  * the URL which table a request lands in — `repository.ts` spells the rest out.
  *
  * There is no GET. The administration screen of part 2 is a Server Component
- * that reads the repository directly, exactly as `app/admin/enlaces/page.tsx`
+ * that reads the repository directly, exactly as `app/admin/catalogo/page.tsx`
  * does, so an endpoint returning the same data would be a second way to be
  * right about it.
  */

@@ -4,7 +4,7 @@ import { ERROR_INTERNO, type RecursoTipo } from "@/lib/asignaciones/errors";
  * The browser's side of `/api/usuarios/{id}/asignaciones` — one function per
  * verb, and one shape for every answer.
  *
- * Same contract as `app/admin/enlaces/enlaces-client.ts` and its procesadores
+ * Same contract as `app/admin/catalogo/enlaces-client.ts` and its procesadores
  * sibling: every action has the three outcomes (done, refused, unreachable) and
  * the same unwrapping to do, so writing it once leaves the screen holding only
  * the decision of WHAT to send. No message is written here that the API could

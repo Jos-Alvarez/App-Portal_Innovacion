@@ -9,7 +9,8 @@ const notFound = vi.fn(() => {
   throw new Error("NEXT_NOT_FOUND");
 });
 
-vi.mock("next/navigation", () => ({ notFound: () => notFound() }));
+/* `usePathname` lo lee el menú de sesión de la topbar, que esta pantalla monta. */
+vi.mock("next/navigation", () => ({ notFound: () => notFound(), usePathname: () => "/" }));
 vi.mock("@/lib/authz", () => ({
   guardPageResource: (...args: unknown[]) => guardPageResource(...args),
 }));

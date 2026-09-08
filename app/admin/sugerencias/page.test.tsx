@@ -142,7 +142,12 @@ describe("/admin/sugerencias", () => {
     render(await SugerenciasAdminPage());
 
     expect(screen.getByText("Rosa Díaz")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /cerrar sesión/i })).toBeInTheDocument();
+    /* La salida vive detrás del menú de sesión; lo que la pantalla garantiza
+       es que ese menú esté montado. `session-menu.test.tsx` cubre su interior. */
+    expect(screen.getByRole("button", { name: "Rosa Díaz" })).toHaveAttribute(
+      "aria-haspopup",
+      "menu",
+    );
     expect(screen.getByRole("link", { name: /portal de innovación/i })).toHaveAttribute("href", "/");
   });
 });

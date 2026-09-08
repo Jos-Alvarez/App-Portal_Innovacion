@@ -34,7 +34,7 @@ import { listarSugerencias } from "@/lib/sugerencias/repository";
  * ADR 0003 lists the portal's administrative endpoints as `/api/enlaces`,
  * `/api/procesadores`, `/api/usuarios/{id}/asignaciones`, `/api/admins` — the
  * resource first, never an `admin` prefix. The prefix exists on SCREENS
- * (`/admin/enlaces`) because a person reads the address bar; it does not exist on
+ * (`/admin/catalogo`) because a person reads the address bar; it does not exist on
  * the API, and inventing it here for one route would leave the portal with two
  * conventions and no rule for choosing between them.
  *

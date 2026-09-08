@@ -2,8 +2,6 @@
 
 import { ErrorState } from "@/components/states/error-state";
 
-import styles from "./analitica.module.css";
-
 /**
  * Error — DESIGN.md: "círculo rojo '!', lenguaje claro sin códigos, botón
  * Reintentar".
@@ -20,7 +18,7 @@ import styles from "./analitica.module.css";
  */
 export default function ErrorAnalitica({ reset }: { error: Error; reset: () => void }) {
   return (
-    <main className={styles.main}>
+    <main className="lx-main">
       <ErrorState
         title="No pudimos cargar la analítica"
         description="Hubo un problema al calcular los datos de uso del portal. Intenta de nuevo; si sigue ocurriendo, avisa al equipo de sistemas."

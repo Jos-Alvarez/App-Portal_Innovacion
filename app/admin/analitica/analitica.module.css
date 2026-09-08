@@ -12,16 +12,6 @@
  * encabeza la lista y con cuántos usos.
  */
 
-.main {
-  display: grid;
-  gap: 24px;
-  align-content: start;
-  max-width: 1180px;
-  min-height: 100dvh;
-  margin: 0 auto;
-  padding: 28px 24px 64px;
-}
-
 .header {
   display: grid;
   gap: 6px;

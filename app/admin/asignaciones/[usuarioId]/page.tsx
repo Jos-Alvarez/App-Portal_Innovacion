@@ -54,7 +54,7 @@ interface Contexto {
  */
 function PersonaNoEncontrada({ usuario }: { usuario: AuthorizedUsuario }) {
   return (
-    <main className={styles.main}>
+    <main className="lx-main">
       <Topbar usuario={usuario} />
 
       <header className={styles.header}>
@@ -101,7 +101,7 @@ export default async function AsignacionesDeUsuarioPage({ params }: Contexto) {
   ]);
 
   return (
-    <main className={styles.main}>
+    <main className="lx-main">
       {/* La misma barra que el portal: identidad, tema, la puerta al rol y la
           salida. El «volver» de abajo sigue siendo el camino a la lista; el logo
           es el camino al portal. */}

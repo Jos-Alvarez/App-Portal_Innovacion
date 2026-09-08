@@ -27,7 +27,7 @@ import styles from "./portal.module.css";
  * dashboard and nothing else. Placed at `app/`, those two files would also
  * become the boundaries of `/login` — a public screen that reads no database
  * and would inherit a skeleton shaped like a resource table. It is the same
- * reasoning `app/admin/enlaces` used to REJECT a group: there the group would
+ * reasoning `app/admin/catalogo` REJECTS a group: there the group would
  * have cost the `admin` prefix in the address bar, here the URL is already the
  * one we want and only the boundaries move.
  *
@@ -71,7 +71,7 @@ export default async function PortalPage() {
   const recursos = await listarRecursosAsignados(prisma, acceso.usuario.id);
 
   return (
-    <main className={styles.main}>
+    <main className="lx-main">
       {/* The lockup, the theme toggle, the way out and — for an administrator —
           the door to the role screen (item #17). `preloadLogo` because this is
           the screen a reader lands on after signing in. */}

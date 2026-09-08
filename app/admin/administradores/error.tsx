@@ -2,8 +2,6 @@
 
 import { ErrorState } from "@/components/states/error-state";
 
-import styles from "./administradores.module.css";
-
 /**
  * Error — DESIGN.md: "círculo rojo '!', lenguaje claro sin códigos, botón
  * Reintentar".
@@ -15,7 +13,7 @@ import styles from "./administradores.module.css";
  */
 export default function ErrorAdministradores({ reset }: { error: Error; reset: () => void }) {
   return (
-    <main className={styles.main}>
+    <main className="lx-main">
       <ErrorState
         title="No pudimos cargar la gestión de administradores"
         description="Hubo un problema al leer quién administra el portal. Intenta de nuevo; si sigue ocurriendo, avisa al equipo de sistemas."

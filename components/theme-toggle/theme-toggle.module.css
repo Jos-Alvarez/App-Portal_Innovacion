@@ -1,9 +1,35 @@
 /*
- * The ☾/☀ mark. The button's shape, border and hover come from the shared
- * `.lx-icon-btn` class in globals.css — the same treatment the sign-out button
- * wears — so the only thing left here is sizing the glyph inside it.
+ * The ☾ mark and the ✓ beside it. The row's shape, hover and focus come from the
+ * shared `.lx-menu-item` class in globals.css — the same treatment the sign-out
+ * entry wears — so what is left here is the two glyphs inside it.
  */
 .glyph {
+  flex: none;
+  width: 17px;
   font-size: 16px;
   line-height: 1;
+  text-align: center;
+}
+
+/*
+ * `margin-left: auto` pins it to the far edge of the row, where a checkmark is
+ * read for.
+ *
+ * Hidden with `opacity` rather than by not rendering it: the row keeps the same
+ * width whichever way the setting sits, so pressing it does not resize the menu
+ * under the pointer that just pressed it. `visibility` would do the same, but
+ * opacity is what the 0.15s transition can animate.
+ */
+.check {
+  flex: none;
+  margin-left: auto;
+  color: var(--navy-fg);
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.check[data-activo="true"] {
+  opacity: 1;
 }

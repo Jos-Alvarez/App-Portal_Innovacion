@@ -1,7 +1,5 @@
 import { Skeleton } from "@/components/states/skeleton";
 
-import styles from "./analitica.module.css";
-
 /**
  * Carga — DESIGN.md: "skeleton shimmer con la geometría del contenido real;
  * nunca pantalla en blanco".
@@ -18,7 +16,7 @@ import styles from "./analitica.module.css";
  */
 export default function CargandoAnalitica() {
   return (
-    <main className={styles.main}>
+    <main className="lx-main">
       <Skeleton
         label="Cargando la analítica"
         blocks={[

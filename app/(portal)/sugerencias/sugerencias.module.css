@@ -3,20 +3,10 @@
  * button, the chips, the toast and the empty state are the shared ones. This
  * file lays them out and dresses the one thing the components layer does not
  * ship — a <textarea> — with the very treatment "Componentes" already
- * prescribes for inputs, which is what `app/admin/enlaces/enlaces.module.css`
+ * prescribes for inputs, which is what `app/admin/catalogo/catalogo.module.css`
  * does with its <select>. The topbar lockup left this file with item #17, which
  * extracted it into `components/topbar`.
  */
-
-.main {
-  display: grid;
-  gap: 24px;
-  align-content: start;
-  max-width: 900px;
-  min-height: 100dvh;
-  margin: 0 auto;
-  padding: 20px 24px 64px;
-}
 
 .volver {
   justify-self: start;

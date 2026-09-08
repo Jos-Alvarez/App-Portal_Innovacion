@@ -1,18 +1,29 @@
 /*
  * The topbar lockup, moved here from the three screens that each carried a copy
- * of it (items #8, #10 and #13). The rules are unchanged: this is an extraction,
- * not a redesign, so the bar looks exactly as it did before item #17.
+ * of it (items #8, #10 and #13), and since then the home of the session cluster
+ * and the panel nav as well.
  */
 
 /*
  * DESIGN.md "Logo": "topbar (58px + separador vertical + 'Portal de
  * Innovación')". The logo component deliberately ships without the lockup — it
  * is composition — so this is where the pieces meet.
+ *
+ * ONE ROW, NOT TWO. The bar used to declare a second row for the nav
+ * (`flex-basis: 100%`) so that the session cluster could never be the thing that
+ * wrapped. The row is gone: lockup, nav and session cluster now share the
+ * logo's line, which is what the reference design shows and what keeps the bar
+ * 58px tall instead of nearly twice that.
+ *
+ * `flex-wrap` stays as the narrow-screen fallback — under roughly 1100px the nav
+ * drops to its own line by itself. That is a viewport reacting, not a layout
+ * declared, so wide screens get the single row and small ones still get a bar
+ * that fits.
  */
 .topbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px;
+  gap: 10px 18px;
   align-items: center;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border);
@@ -47,72 +58,169 @@
 .marca {
   font-weight: 700;
   color: var(--navy-fg);
+  white-space: nowrap;
 }
 
 /*
- * El grupo de sesión: los dos íconos y el nombre, a la altura del logo y contra
- * el borde derecho. `auto` se come todo el espacio libre de la primera fila.
- *
- * `flex-wrap` sigue puesto para una pantalla muy angosta: ahí el nombre baja de
- * línea debajo de sus dos controles en vez de desbordar la barra.
+ * El grupo de sesión: ahora un solo objeto — el disparador — y el panel que
+ * cuelga de él. `margin-left: auto` se come todo el espacio libre que deje la
+ * nav; `position: relative` es el ancla contra la que se posiciona el panel.
  */
 .sesion {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: center;
+  position: relative;
+  flex-shrink: 0;
   margin-left: auto;
 }
 
 /*
- * La navegación del panel: seis entradas, solo para administradores.
+ * El disparador: el disco y el nombre leídos como una sola cosa.
  *
- * Toma prestado el idioma visual del chip de filtro de DESIGN.md — "activo =
- * navy relleno, inactivo = borde + --muted" — porque responde la misma pregunta
- * que un chip: cuál de este conjunto está seleccionado. Reusar el tratamiento
- * evita inventar un tercer lenguaje para "dónde estoy" en una interfaz que ya
- * tiene uno.
+ * Sin borde en reposo, como en el diseño de referencia. El disco navy ya recorta
+ * el bloque contra la barra, así que un borde alrededor sería una segunda línea
+ * diciendo lo mismo. El hover lo pinta con la misma superficie que las filas de
+ * las tablas — `--surface2` — para que el portal tenga un solo idioma de "esto
+ * responde al puntero".
+ */
+.disparador {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  padding: 3px 10px 3px 3px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.disparador:hover {
+  background: var(--surface2);
+}
+
+.disparador:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+/*
+ * La inicial del nombre en un disco navy, como en el diseño de referencia. Es
+ * decoración: el nombre que la acompaña ya dice quién sos, así que va
+ * `aria-hidden` y no agrega nada que anunciar.
+ */
+.avatar {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  background: var(--navy);
+  color: var(--on-primary);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+/*
+ * El nombre. Es el nombre accesible del disparador, así que no puede esconderse
+ * en pantallas chicas: `--fs-meta` en `--muted` lo baja de peso sin sacarlo,
+ * que es lo que pedía DESIGN.md para un metadato.
+ */
+.nombre {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/*
+ * El panel. Anclado al borde derecho del disparador porque es el borde contra el
+ * que vive todo el grupo: abrirlo hacia la izquierda lo dejaría colgando fuera
+ * de la pantalla en un viewport angosto.
  *
- * `flex-basis: 100%` le da la segunda fila entera: la barra ya envolvía sola en
- * cuanto la nav creció a seis entradas, pero envolvía por ancho y lo primero que
- * se caía era el nombre. Declarar la fila en vez de esperar a que el viewport la
- * provoque deja el grupo de sesión arriba en cualquier ancho, sin media queries.
+ * `--radius-card` y `--shadow` son los mismos de las tarjetas del portal — la
+ * "sombra doble suave" de DESIGN.md — porque esto ES una tarjeta flotante y no
+ * hay razón para que se vea como otra cosa.
+ */
+.menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 210px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+/*
+ * La línea entre la puerta de administradores y lo que hacés con tu sesión.
+ * Separa dos grupos que responden preguntas distintas — a dónde voy contra qué
+ * le hago a mi sesión — y lleva `role="separator"`, así que lo dice además de
+ * mostrarlo. Los márgenes negativos la estiran hasta el borde del panel, donde
+ * una división se lee.
+ */
+.separadorMenu {
+  height: 1px;
+  margin: 5px -6px;
+  background: var(--border);
+}
+
+/*
+ * La navegación del panel: las cinco pantallas de todos los días, solo para
+ * administradores, en la misma fila que el logo. La sexta — Administradores —
+ * vive en el menú de sesión.
  *
- * Alineada a la izquierda, arrancando bajo el logo: las seis entradas son la
- * navegación del portal, y una navegación se lee desde el mismo borde donde
- * empieza todo lo demás de la pantalla. El grupo de sesión es lo que vive contra
- * el borde opuesto, y así los dos bloques no compiten por la misma esquina.
+ * SIN BORDES. Hasta acá cada entrada era un chip con borde propio, una hilera de
+ * rectángulos delineados que pesaban más que la pantalla que enmarcaban. Ahora
+ * son texto plano y sólo la actual se pinta: menos tinta para la misma
+ * información, que es exactamente lo que muestra el diseño de referencia.
+ *
+ * El relleno de la actual sigue siendo el idioma visual que DESIGN.md ya tiene
+ * para "cuál de este conjunto está seleccionado" — el chip de filtro — nada más
+ * que en su variante suave (--cyan-soft) en vez del navy lleno, porque sin
+ * bordes alrededor no necesita gritar para distinguirse.
  */
 .adminNav {
   display: flex;
   flex-wrap: wrap;
-  flex-basis: 100%;
-  gap: 6px;
+  gap: 2px;
   align-items: center;
 }
 
 .adminLink {
-  padding: 6px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
+  padding: 7px 14px;
+  border-radius: var(--radius-control);
   color: var(--muted);
   font-size: var(--fs-body-sm);
   font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .adminLink:hover:not([data-actual="true"]) {
-  border-color: var(--cyan);
+  background: var(--surface2);
   color: var(--navy-fg);
 }
 
-/* La pantalla que se está leyendo. `aria-current` lo dice; esto lo muestra. */
+/*
+ * La pantalla que se está leyendo. `aria-current` lo dice; esto lo muestra.
+ *
+ * El par --cyan-soft / --navy-fg está definido en los dos temas, así que el
+ * resaltado sobrevive el modo oscuro sin una regla propia.
+ */
 .adminLink[data-actual="true"] {
-  border-color: transparent;
-  background: var(--navy);
-  color: var(--on-primary);
+  background: var(--cyan-soft);
+  color: var(--navy-fg);
 }
 
 .adminLink:focus-visible {
