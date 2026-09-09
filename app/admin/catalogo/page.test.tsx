@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const guardPageAdmin = vi.fn();
 const listarEnlaces = vi.fn();
 const listarProcesadores = vi.fn();
+const asignadosPorRecurso = vi.fn();
+const listarUsuarios = vi.fn();
 
 /* La pantalla cliente pide el router al montarse. */
 /* La topbar dibuja la navegacion del panel, que lee la ruta actual. */
@@ -18,6 +20,10 @@ vi.mock("@/lib/enlaces/repository", () => ({ listarEnlaces: () => listarEnlaces(
 vi.mock("@/lib/procesadores/repository", () => ({
   listarProcesadores: () => listarProcesadores(),
 }));
+vi.mock("@/lib/asignaciones/repository", () => ({
+  asignadosPorRecurso: (...args: unknown[]) => asignadosPorRecurso(...args),
+}));
+vi.mock("@/lib/usuarios/repository", () => ({ listarUsuarios: () => listarUsuarios() }));
 
 import CatalogoAdminPage from "./page";
 
@@ -64,6 +70,8 @@ describe("/admin/catalogo", () => {
     guardPageAdmin.mockReset();
     listarEnlaces.mockReset().mockResolvedValue([]);
     listarProcesadores.mockReset().mockResolvedValue([]);
+    asignadosPorRecurso.mockReset().mockResolvedValue(new Map());
+    listarUsuarios.mockReset().mockResolvedValue([]);
   });
 
   it("guards itself, and reads nothing when the reader is refused", async () => {
@@ -75,12 +83,17 @@ describe("/admin/catalogo", () => {
     /* Ninguno de los dos catálogos sale de la base para quien no puede verlo. */
     expect(listarEnlaces).not.toHaveBeenCalled();
     expect(listarProcesadores).not.toHaveBeenCalled();
+    expect(asignadosPorRecurso).not.toHaveBeenCalled();
+    expect(listarUsuarios).not.toHaveBeenCalled();
   });
 
   it("shows both catalogues to an administrator, bajas included", async () => {
     guardPageAdmin.mockResolvedValue({ allowed: true, usuario: USUARIA });
     listarEnlaces.mockResolvedValue([ENLACE]);
     listarProcesadores.mockResolvedValue([PROCESADOR]);
+    asignadosPorRecurso
+      .mockResolvedValueOnce(new Map([[7, [11, 12]]]))
+      .mockResolvedValueOnce(new Map());
 
     render(await CatalogoAdminPage());
 
@@ -89,6 +102,9 @@ describe("/admin/catalogo", () => {
     expect(screen.getByText("Facturación electrónica")).toBeInTheDocument();
     expect(screen.getByText("Maestro de Excel")).toBeInTheDocument();
     expect(screen.getByText("Dado de baja")).toBeInTheDocument();
+    /* El conteo de asignados de cada tabla llega hasta su fila. */
+    expect(screen.getByText("2 usuarios")).toBeInTheDocument();
+    expect(screen.getByText("0 usuarios")).toBeInTheDocument();
   });
 
   /*

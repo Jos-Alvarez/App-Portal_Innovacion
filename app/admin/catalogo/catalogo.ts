@@ -43,6 +43,8 @@ interface CamposComunes {
   readonly descripcion: string | null;
   readonly tipo: TipoRecurso;
   readonly activo: boolean;
+  /** Ids of the accounts that hold a grant over this resource right now, sorted. */
+  readonly idsUsuariosAsignados: readonly number[];
   /** Enlaces only. */
   readonly url: string | null;
   /** Procesadores only, all five. */
@@ -65,7 +67,7 @@ export type FilaCatalogo =
   | (CamposComunes & { readonly clase: "enlace"; readonly enlace: EnlaceDTO })
   | (CamposComunes & { readonly clase: "procesador"; readonly procesador: ProcesadorDTO });
 
-function deEnlace(enlace: EnlaceDTO): FilaCatalogo {
+function deEnlace(enlace: EnlaceDTO, idsUsuariosAsignados: readonly number[]): FilaCatalogo {
   return {
     clase: "enlace",
     enlace,
@@ -75,6 +77,7 @@ function deEnlace(enlace: EnlaceDTO): FilaCatalogo {
     descripcion: enlace.descripcion,
     tipo: enlace.tipo,
     activo: enlace.activo,
+    idsUsuariosAsignados,
     url: enlace.url,
     claveProcesador: null,
     formatos: null,
@@ -84,7 +87,10 @@ function deEnlace(enlace: EnlaceDTO): FilaCatalogo {
   };
 }
 
-function deProcesador(procesador: ProcesadorDTO): FilaCatalogo {
+function deProcesador(
+  procesador: ProcesadorDTO,
+  idsUsuariosAsignados: readonly number[],
+): FilaCatalogo {
   return {
     clase: "procesador",
     procesador,
@@ -94,6 +100,7 @@ function deProcesador(procesador: ProcesadorDTO): FilaCatalogo {
     descripcion: procesador.descripcion,
     tipo: "procesador",
     activo: procesador.activo,
+    idsUsuariosAsignados,
     url: null,
     claveProcesador: procesador.claveProcesador,
     formatos: describirFormatos(procesador.formatosAceptados),
@@ -116,8 +123,21 @@ function deProcesador(procesador: ProcesadorDTO): FilaCatalogo {
 export function filasDelCatalogo(
   enlaces: readonly EnlaceDTO[],
   procesadores: readonly ProcesadorDTO[],
+  asignadosPorRecurso: Readonly<Record<string, readonly number[]>> = {},
 ): FilaCatalogo[] {
-  return [...enlaces.map(deEnlace), ...procesadores.map(deProcesador)].sort((a, b) =>
-    a.nombre.localeCompare(b.nombre, "es"),
-  );
+  /*
+   * Keyed by the SAME `clave` the row carries — `enlace:7`, `procesador:4` —
+   * because the two id spaces overlap and the class is the only thing that
+   * tells `enlace:7` from `procesador:7` apart. A resource with no grants is
+   * absent from the map (see `asignadosPorRecurso`), and its row reads that gap
+   * as an empty list: no users, count zero.
+   */
+  const filas = [
+    ...enlaces.map((enlace) => deEnlace(enlace, asignadosPorRecurso[`enlace:${enlace.id}`] ?? [])),
+    ...procesadores.map((procesador) =>
+      deProcesador(procesador, asignadosPorRecurso[`procesador:${procesador.id}`] ?? []),
+    ),
+  ];
+
+  return filas.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 }

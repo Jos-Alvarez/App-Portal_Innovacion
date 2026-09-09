@@ -30,6 +30,14 @@ vi.mock("./procesadores-client", () => ({
   restaurarProcesador: (...args: unknown[]) => restaurarProcesador(...args),
 }));
 
+const asignarRecurso = vi.fn();
+const revocarRecurso = vi.fn();
+
+vi.mock("../asignaciones/asignaciones-client", () => ({
+  asignarRecurso: (...args: unknown[]) => asignarRecurso(...args),
+  revocarRecurso: (...args: unknown[]) => revocarRecurso(...args),
+}));
+
 import { CatalogoAdmin } from "./catalogo-admin";
 
 /**
@@ -93,14 +101,47 @@ const PROCESADOR_DE_BAJA = {
   activo: false,
 } as const;
 
+/** El padrón entero del portal — la búsqueda del diálogo «Asignar» lo filtra. */
+const USUARIOS = [
+  {
+    id: 1,
+    nombre: "Ana Ríos",
+    correo: "ana.rios@limaexpresa.pe",
+    area: "Innovación",
+    esAdmin: false,
+    activo: true,
+    enlacesAsignados: 1,
+    procesadoresAsignados: 0,
+  },
+  {
+    id: 2,
+    nombre: "Beto Sosa",
+    correo: "beto.sosa@limaexpresa.pe",
+    area: "Peajes",
+    esAdmin: false,
+    activo: true,
+    enlacesAsignados: 0,
+    procesadoresAsignados: 0,
+  },
+] as const;
+
 function renderAdmin(
   enlaces: readonly (typeof ENLACE | typeof ENLACE_DE_BAJA)[] = [ENLACE, ENLACE_DE_BAJA],
   procesadores: readonly (typeof PROCESADOR | typeof PROCESADOR_DE_BAJA)[] = [
     PROCESADOR,
     PROCESADOR_DE_BAJA,
   ],
+  asignadosPorRecurso: Readonly<Record<string, readonly number[]>> = {},
+  usuarios: readonly (typeof USUARIOS)[number][] = USUARIOS,
 ) {
-  render(<CatalogoAdmin enlaces={enlaces} procesadores={procesadores} />);
+  render(
+    <CatalogoAdmin
+      enlaces={enlaces}
+      procesadores={procesadores}
+      usuarios={usuarios}
+      asignadosPorRecurso={asignadosPorRecurso}
+    />,
+  );
   return userEvent.setup();
 }
 
@@ -123,6 +164,8 @@ async function llenarAltaDeProcesador(user: ReturnType<typeof userEvent.setup>) 
 describe("<CatalogoAdmin />", () => {
   beforeEach(() => {
     refresh.mockReset();
+    asignarRecurso.mockReset().mockResolvedValue({ ok: true, asignado: true });
+    revocarRecurso.mockReset().mockResolvedValue({ ok: true, asignado: false });
     crearEnlace.mockReset().mockResolvedValue({ ok: true, enlace: ENLACE });
     editarEnlace.mockReset().mockResolvedValue({ ok: true, enlace: ENLACE });
     darDeBajaEnlace.mockReset().mockResolvedValue({ ok: true, enlace: { ...ENLACE, activo: false } });
@@ -148,10 +191,10 @@ describe("<CatalogoAdmin />", () => {
     /* Encabezado primero; después el catálogo entero, mezclado por nombre y no
        por tabla de origen. */
     expect(filas.slice(1).map((fila) => within(fila).getAllByRole("cell")[0]?.textContent)).toEqual([
-      "Asistente de contratos",
-      "Facturación electrónicaEmisión de comprobantes",
-      "Limpieza de Word",
-      "Maestro de ExcelConsolida los maestros mensuales",
+      "Asistente de contratoshttps://contratos.limaexpresa.pe",
+      "Facturación electrónicahttps://facturacion.limaexpresa.pe",
+      "Limpieza de WordProcesador interno · docx · 10 MB",
+      "Maestro de ExcelProcesador interno · xlsx, csv · 25 MB",
     ]);
   });
 
@@ -165,35 +208,76 @@ describe("<CatalogoAdmin />", () => {
     expect(catalogo.getAllByText("Procesador")).toHaveLength(2);
   });
 
-  it("hace legible el contrato de ejecución de un procesador, topes incluidos", () => {
-    renderAdmin();
-
-    /* Acotado a la tabla: la lista de <option> del formulario nombra las salidas también. */
-    const catalogo = within(screen.getByRole("table"));
-
-    expect(catalogo.getByText("maestro-excel")).toBeInTheDocument();
-    expect(catalogo.getByText("xlsx, csv")).toBeInTheDocument();
-    expect(catalogo.getByText("Mínimo 1 · Máximo 5")).toBeInTheDocument();
-    /* Bytes en la columna, megabytes en la pantalla. */
-    expect(catalogo.getByText("25 MB por archivo · 80 MB en total")).toBeInTheDocument();
-    /* Un tope ausente se escribe, nunca se deja como celda vacía. */
-    expect(catalogo.getByText("Mínimo 1 · Sin tope")).toBeInTheDocument();
-    expect(catalogo.getByText("10 MB por archivo · Sin tope en total")).toBeInTheDocument();
-    expect(catalogo.getByText("Un ZIP con varios archivos")).toBeInTheDocument();
-  });
-
-  it("dice «No aplica» donde la columna es del otro recurso, en vez de callar", () => {
+  it("resume cada recurso en una línea bajo el nombre: dirección o ficha del procesador", () => {
     renderAdmin([ENLACE], [PROCESADOR]);
 
     const catalogo = within(screen.getByRole("table"));
 
-    /* Cuatro por el enlace (clave, formatos, contrato, salida) y una por el
-       procesador (dirección): un <td> vacío se leería igual que un dato perdido. */
-    expect(catalogo.getAllByText("No aplica")).toHaveLength(5);
+    /* El enlace lleva su dirección, y abrir en pestaña nueva no puede dejar un
+       handle a esta — de ahí el `rel`. */
     expect(catalogo.getByRole("link", { name: /facturacion\.limaexpresa\.pe/i })).toHaveAttribute(
       "rel",
       "noopener noreferrer",
     );
+    /* El procesador no tiene dirección: en su lugar, qué es, qué acepta y qué
+       tamaño admite — lo que antes ocupaba cinco columnas. */
+    expect(catalogo.getByText("Procesador interno · xlsx, csv · 25 MB")).toBeInTheDocument();
+  });
+
+  it("cuenta cuántas personas tienen cada recurso, y escribe el cero como frase", () => {
+    renderAdmin([ENLACE], [PROCESADOR], { "enlace:7": [4, 5, 6], "procesador:4": [7] });
+
+    const catalogo = within(screen.getByRole("table"));
+
+    expect(catalogo.getByText("3 usuarios")).toBeInTheDocument();
+    expect(catalogo.getByText("1 usuario")).toBeInTheDocument();
+  });
+
+  it("sin conteo, un recurso que nadie tiene dice «0 usuarios», no una celda vacía", () => {
+    renderAdmin([ENLACE], []);
+
+    expect(within(screen.getByRole("table")).getByText("0 usuarios")).toBeInTheDocument();
+  });
+
+  it("abre el diálogo «Asignar» sobre el recurso, con quien ya lo tiene", async () => {
+    const user = renderAdmin([ENLACE], [], { "enlace:7": [1] });
+
+    await user.click(
+      within(screen.getByRole("table")).getByRole("button", {
+        name: /asignar facturación electrónica/i,
+      }),
+    );
+
+    const dialogo = within(screen.getByRole("dialog", { name: /accesos a facturación electrónica/i }));
+    expect(dialogo.getByText("Ana Ríos")).toBeInTheDocument();
+    expect(
+      dialogo.getByRole("button", { name: /quitar el acceso de ana ríos/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("quita un acceso llamando al endpoint del usuario y el recurso", async () => {
+    revocarRecurso.mockResolvedValue({ ok: true, asignado: false });
+    const user = renderAdmin([ENLACE], [], { "enlace:7": [1] });
+
+    await user.click(
+      screen.getByRole("button", { name: /asignar facturación electrónica/i }),
+    );
+    await user.click(screen.getByRole("button", { name: /quitar el acceso de ana ríos/i }));
+
+    expect(revocarRecurso).toHaveBeenCalledWith(1, "enlace", 7);
+  });
+
+  it("desde el selector de colaboradores concede el acceso sobre ese recurso", async () => {
+    asignarRecurso.mockResolvedValue({ ok: true, asignado: true });
+    const user = renderAdmin([ENLACE], [], { "enlace:7": [1] });
+
+    await user.click(
+      screen.getByRole("button", { name: /asignar facturación electrónica/i }),
+    );
+    await user.click(screen.getByRole("button", { name: /^agregar$/i }));
+    await user.click(screen.getByRole("button", { name: /dar acceso a beto sosa/i }));
+
+    expect(asignarRecurso).toHaveBeenCalledWith(2, "enlace", 7);
   });
 
   it("abre el alta de un enlace en un diálogo y la cierra sin guardar nada", async () => {

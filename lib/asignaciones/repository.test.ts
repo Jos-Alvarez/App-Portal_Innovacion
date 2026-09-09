@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { AsignacionesClient } from "@/lib/asignaciones/repository";
 import {
   asignarRecurso,
+  asignadosPorRecurso,
   leerRecursoAsignable,
   leerUsuarioAsignable,
   revocarRecurso,
@@ -39,13 +40,19 @@ function clientDouble() {
   const enlaceDelete = vi.fn(async (_args: unknown) => ({}));
   const procesadorCreate = vi.fn(async (_args: unknown) => ({}));
   const procesadorDelete = vi.fn(async (_args: unknown) => ({}));
+  const enlaceFindMany = vi.fn(async (_args: unknown) => [] as unknown[]);
+  const procesadorFindMany = vi.fn(async (_args: unknown) => [] as unknown[]);
 
   const client = {
     usuario: { findUnique: usuarioFindUnique },
     enlace: { findUnique: enlaceFindUnique },
     procesador: { findUnique: procesadorFindUnique },
-    asignacionEnlace: { create: enlaceCreate, delete: enlaceDelete },
-    asignacionProcesador: { create: procesadorCreate, delete: procesadorDelete },
+    asignacionEnlace: { create: enlaceCreate, delete: enlaceDelete, findMany: enlaceFindMany },
+    asignacionProcesador: {
+      create: procesadorCreate,
+      delete: procesadorDelete,
+      findMany: procesadorFindMany,
+    },
   } as unknown as AsignacionesClient;
 
   return {
@@ -57,6 +64,8 @@ function clientDouble() {
     enlaceDelete,
     procesadorCreate,
     procesadorDelete,
+    enlaceFindMany,
+    procesadorFindMany,
   };
 }
 
@@ -119,6 +128,52 @@ describe("leerRecursoAsignable", () => {
     procesadorFindUnique.mockResolvedValue(null as never);
 
     expect(await leerRecursoAsignable(client, "procesador", 999)).toBeNull();
+  });
+});
+
+describe("asignadosPorRecurso", () => {
+  it("groups the enlace grants by enlace, and never touches the procesador table", async () => {
+    const { client, enlaceFindMany, procesadorFindMany } = clientDouble();
+    enlaceFindMany.mockResolvedValue([
+      { enlaceId: 7, usuarioId: 2 },
+      { enlaceId: 7, usuarioId: 5 },
+      { enlaceId: 9, usuarioId: 1 },
+    ] as never);
+
+    const porRecurso = await asignadosPorRecurso(client, "enlace");
+
+    expect(enlaceFindMany.mock.calls[0][0]).toEqual({
+      select: { enlaceId: true, usuarioId: true },
+      orderBy: [{ enlaceId: "asc" }, { usuarioId: "asc" }],
+    });
+    expect([...porRecurso]).toEqual([
+      [7, [2, 5]],
+      [9, [1]],
+    ]);
+    expect(procesadorFindMany).not.toHaveBeenCalled();
+  });
+
+  it("groups the procesador grants by procesador, and never touches the enlace table", async () => {
+    const { client, enlaceFindMany, procesadorFindMany } = clientDouble();
+    procesadorFindMany.mockResolvedValue([
+      { procesadorId: 4, usuarioId: 8 },
+      { procesadorId: 4, usuarioId: 9 },
+    ] as never);
+
+    const porRecurso = await asignadosPorRecurso(client, "procesador");
+
+    expect(procesadorFindMany.mock.calls[0][0]).toEqual({
+      select: { procesadorId: true, usuarioId: true },
+      orderBy: [{ procesadorId: "asc" }, { usuarioId: "asc" }],
+    });
+    expect([...porRecurso]).toEqual([[4, [8, 9]]]);
+    expect(enlaceFindMany).not.toHaveBeenCalled();
+  });
+
+  it("a resource with no grants is absent from the map, not an empty-list entry", async () => {
+    const { client } = clientDouble();
+
+    expect((await asignadosPorRecurso(client, "enlace")).size).toBe(0);
   });
 });
 

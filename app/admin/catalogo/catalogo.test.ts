@@ -105,6 +105,24 @@ describe("filasDelCatalogo", () => {
     expect(filas.map((fila) => fila.clave)).toEqual(["enlace:4", "procesador:4"]);
   });
 
+  it("cuelga de cada fila los ids de quienes tienen ese recurso, por su clave", () => {
+    const filas = filasDelCatalogo([ENLACE], [PROCESADOR], {
+      "enlace:7": [2, 5, 9],
+      "procesador:4": [1],
+    });
+
+    expect(filas.map((fila) => [fila.clave, fila.idsUsuariosAsignados])).toEqual([
+      ["enlace:7", [2, 5, 9]],
+      ["procesador:4", [1]],
+    ]);
+  });
+
+  it("un recurso ausente del mapa queda con la lista vacía, no con un hueco", () => {
+    const [fila] = filasDelCatalogo([ENLACE], [], {});
+
+    expect(fila.idsUsuariosAsignados).toEqual([]);
+  });
+
   it("no inventa filas cuando el catálogo está vacío", () => {
     expect(filasDelCatalogo([], [])).toEqual([]);
   });

@@ -73,6 +73,51 @@ export async function leerRecursoAsignable(
 }
 
 /**
+ * Which accounts hold a grant over each resource of `tipo`, keyed by the
+ * resource id and each list sorted by `usuarioId`.
+ *
+ * The catalogue reads this two ways from one round trip: the count column is
+ * the list's length, and the "Asignar" dialog is the list itself intersected
+ * with the portal's accounts. A resource nobody holds is ABSENT from the map,
+ * and both readers take that gap as an empty list.
+ *
+ * `findMany` of the bare pair and grouped in JS, not `groupBy`: `groupBy` can
+ * only give the count, and the dialog needs the ids. The two grant tables have
+ * no shared parent (ADR 0002), so the branch is written out once per table like
+ * every other function here.
+ */
+export async function asignadosPorRecurso(
+  client: AsignacionesClient,
+  tipo: RecursoTipo,
+): Promise<Map<number, number[]>> {
+  const porRecurso = new Map<number, number[]>();
+
+  if (tipo === "enlace") {
+    const filas = await client.asignacionEnlace.findMany({
+      select: { enlaceId: true, usuarioId: true },
+      orderBy: [{ enlaceId: "asc" }, { usuarioId: "asc" }],
+    });
+
+    for (const { enlaceId, usuarioId } of filas) {
+      porRecurso.set(enlaceId, [...(porRecurso.get(enlaceId) ?? []), usuarioId]);
+    }
+
+    return porRecurso;
+  }
+
+  const filas = await client.asignacionProcesador.findMany({
+    select: { procesadorId: true, usuarioId: true },
+    orderBy: [{ procesadorId: "asc" }, { usuarioId: "asc" }],
+  });
+
+  for (const { procesadorId, usuarioId } of filas) {
+    porRecurso.set(procesadorId, [...(porRecurso.get(procesadorId) ?? []), usuarioId]);
+  }
+
+  return porRecurso;
+}
+
+/**
  * Grants the resource to the user.
  *
  * IDEMPOTENT, AND THAT IS THE CONTRACT — not a nicety. When this resolves, the

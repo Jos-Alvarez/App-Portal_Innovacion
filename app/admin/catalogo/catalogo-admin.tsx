@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { Button } from "@/components/button/button";
 import { StatusChip } from "@/components/chip/chip";
@@ -13,10 +13,13 @@ import { Toast } from "@/components/toast/toast";
 import type { EnlaceDTO } from "@/lib/enlaces/repository";
 import type { CrearEnlace } from "@/lib/enlaces/schema";
 import type { ProcesadorDTO } from "@/lib/procesadores/repository";
+import type { UsuarioListadoDTO } from "@/lib/usuarios/repository";
 import type { ActualizarProcesador, CrearProcesador } from "@/lib/procesadores/schema";
 
+import { AsignarRecurso } from "./asignar-recurso";
 import { filasDelCatalogo, type FilaCatalogo } from "./catalogo";
 import styles from "./catalogo.module.css";
+import { bytesAMegabytes } from "./edicion";
 import { EnlaceForm } from "./enlace-form";
 import {
   crearEnlace,
@@ -26,7 +29,7 @@ import {
   type ResultadoEnlace,
 } from "./enlaces-client";
 import { ETIQUETA_RECURSO, TONO_RECURSO } from "./etiquetas-catalogo";
-import { ETIQUETA_SALIDA, TONO_SALIDA } from "./etiquetas-procesadores";
+import { describirFormatos } from "./etiquetas-procesadores";
 import { ProcesadorForm } from "./procesador-form";
 import {
   crearProcesador,
@@ -61,6 +64,14 @@ export interface CatalogoAdminProps {
   /** El catálogo entero, bajas incluidas: una administradora deshace lo que dio de baja. */
   enlaces: readonly EnlaceDTO[];
   procesadores: readonly ProcesadorDTO[];
+  /**
+   * Which accounts hold a grant over each resource, keyed by catalogue `clave`
+   * (`enlace:7`, `procesador:4`). The count column reads its length; the
+   * "Asignar" dialog reads the ids. A resource with no grants is simply absent.
+   */
+  asignadosPorRecurso?: Readonly<Record<string, readonly number[]>>;
+  /** Every account in the portal — the "Asignar" dialog's search filters this. */
+  usuarios?: readonly UsuarioListadoDTO[];
 }
 
 const TOAST_ALTA_ENLACE = "Enlace agregado al catálogo.";
@@ -82,19 +93,26 @@ type Dialogo =
   | { readonly clase: "enlace"; readonly enlace: EnlaceDTO | null }
   | { readonly clase: "procesador"; readonly procesador: ProcesadorDTO | null };
 
-/** La raya de una celda que no aplica a este recurso. */
-function NoAplica() {
-  return (
-    <span className={styles.noAplica}>
-      <span aria-hidden="true">—</span>
-      {/* Un <td> vacío se anuncia como una celda en blanco, que es lo mismo que
-          diría un dato que no llegó. Esto no falta: no aplica. */}
-      <span className="lx-sr-only">No aplica</span>
-    </span>
-  );
+/**
+ * The one line under a procesador's name: what it is, what it eats, how big a
+ * file it takes. The enlace's own sub-line is its address, rendered as a link
+ * in the cell itself; a procesador has no address, so this is what fills that
+ * row instead of the five columns the table used to spread it across.
+ */
+function subtituloProcesador(procesador: ProcesadorDTO): string {
+  return [
+    "Procesador interno",
+    describirFormatos(procesador.formatosAceptados),
+    `${bytesAMegabytes(procesador.tamanoMax)} MB`,
+  ].join(" · ");
 }
 
-export function CatalogoAdmin({ enlaces, procesadores }: CatalogoAdminProps) {
+export function CatalogoAdmin({
+  enlaces,
+  procesadores,
+  asignadosPorRecurso = {},
+  usuarios = [],
+}: CatalogoAdminProps) {
   const router = useRouter();
 
   const [dialogo, setDialogo] = useState<Dialogo | null>(null);
@@ -110,7 +128,32 @@ export function CatalogoAdmin({ enlaces, procesadores }: CatalogoAdminProps) {
    */
   const [confirmacion, setConfirmacion] = useState<{ mensaje: string; nonce: number } | null>(null);
 
-  const filas = filasDelCatalogo(enlaces, procesadores);
+  /*
+   * MEMOIZED, AND NOT AS AN OPTIMIZATION. The three inputs come from the Server
+   * Component, so their identity changes only when the server re-read the
+   * database — which makes every array inside `filas` change identity at
+   * exactly that moment and never on a click. `AsignarRecurso` reads
+   * `idsUsuariosAsignados` by identity to know when the server has spoken
+   * again; rebuilding the list on every render would tell it "new data" on
+   * every keystroke and throw away the answers it had just been given.
+   */
+  const filas = useMemo(
+    () => filasDelCatalogo(enlaces, procesadores, asignadosPorRecurso),
+    [enlaces, procesadores, asignadosPorRecurso],
+  );
+
+  /**
+   * The row whose "Asignar" dialog is open, BY KEY and not by value.
+   *
+   * Holding the row itself would freeze it: `router.refresh()` re-reads the
+   * database and rebuilds `filas`, and a dialog holding the object captured at
+   * click time would go on showing the grants as they were BEFORE the change it
+   * just made. The key survives the rebuild and finds the fresh row.
+   */
+  const [claveAsignando, setClaveAsignando] = useState<string | null>(null);
+  const asignando = claveAsignando === null
+    ? null
+    : (filas.find((fila) => fila.clave === claveAsignando) ?? null);
 
   async function aplicar(
     accion: () => Promise<ResultadoEnlace | ResultadoProcesador>,
@@ -237,6 +280,17 @@ export function CatalogoAdmin({ enlaces, procesadores }: CatalogoAdminProps) {
         >
           Editar
         </Button>
+        {/* Resource-first: opens the dialog over THIS resource, listing who
+            holds it and a search to hand it to someone new. The person-first
+            `/admin/asignaciones` screen still exists for the other direction. */}
+        <Button
+          variant="text"
+          aria-label={`Asignar ${fila.nombre}`}
+          disabled={enviando}
+          onClick={() => setClaveAsignando(fila.clave)}
+        >
+          Asignar
+        </Button>
         {fila.activo ? (
           <Button
             variant="text"
@@ -266,9 +320,12 @@ export function CatalogoAdmin({ enlaces, procesadores }: CatalogoAdminProps) {
   }
 
   /*
-   * The union of both screens' columns. Five of the nine belong to one resource
-   * only, and a row that does not own one draws `NoAplica` — see `catalogo.ts`
-   * on why that is a shape and not a gap.
+   * FIVE COLUMNS, NOT NINE. The union of both screens used to spread a
+   * procesador's contract — key, formats, file counts, size caps, announced
+   * output — across five columns an enlace could only draw a dash in. That
+   * detail moved into one line under the name (`subtituloProcesador`) and into
+   * the edit dialog; the table now answers the question it is actually scanned
+   * for — what is this, is it up, who has it — in one glance.
    */
   const columnas: readonly TableColumn<FilaCatalogo>[] = [
     {
@@ -277,7 +334,23 @@ export function CatalogoAdmin({ enlaces, procesadores }: CatalogoAdminProps) {
       cell: (fila) => (
         <span className={styles.nombre}>
           <span className={styles.nombreTexto}>{fila.nombre}</span>
-          {fila.descripcion ? <span className="lx-meta">{fila.descripcion}</span> : null}
+          {fila.clase === "enlace" ? (
+            /*
+             * `noopener` is not optional: without it the opened page gets a
+             * handle to this one via `window.opener` and can navigate the
+             * portal's own tab elsewhere — reverse tabnabbing.
+             */
+            <a
+              className={styles.direccion}
+              href={fila.enlace.url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {fila.enlace.url}
+            </a>
+          ) : (
+            <span className="lx-meta">{subtituloProcesador(fila.procesador)}</span>
+          )}
         </span>
       ),
     },
@@ -298,59 +371,16 @@ export function CatalogoAdmin({ enlaces, procesadores }: CatalogoAdminProps) {
       ),
     },
     {
-      key: "direccion",
-      header: "Dirección",
-      cell: (fila) =>
-        fila.url === null ? (
-          <NoAplica />
-        ) : (
-          /*
-           * `noopener` is not optional: without it the opened page gets a handle
-           * to this one via `window.opener` and can navigate the portal's own tab
-           * elsewhere — reverse tabnabbing.
-           */
-          <a className={styles.direccion} href={fila.url} target="_blank" rel="noopener noreferrer">
-            {fila.url}
-          </a>
-        ),
-    },
-    {
-      key: "clave",
-      header: "Clave",
-      cell: (fila) =>
-        fila.claveProcesador === null ? (
-          <NoAplica />
-        ) : (
-          <code className={styles.clave}>{fila.claveProcesador}</code>
-        ),
-    },
-    {
-      key: "formatos",
-      header: "Formatos",
-      cell: (fila) => (fila.formatos === null ? <NoAplica /> : <span>{fila.formatos}</span>),
-    },
-    {
-      key: "contrato",
-      header: "Archivos y tamaños",
-      cell: (fila) =>
-        fila.entradas === null || fila.tamanos === null ? (
-          <NoAplica />
-        ) : (
-          <span className={styles.limites}>
-            <span>{fila.entradas}</span>
-            <span className="lx-meta">{fila.tamanos}</span>
-          </span>
-        ),
-    },
-    {
-      key: "salida",
-      header: "Resultado anunciado",
-      cell: (fila) =>
-        fila.salida === null ? (
-          <NoAplica />
-        ) : (
-          <StatusChip tone={TONO_SALIDA[fila.salida]}>{ETIQUETA_SALIDA[fila.salida]}</StatusChip>
-        ),
+      key: "usuarios",
+      header: "Usuarios",
+      cell: (fila) => (
+        /* Zero is a sentence, not a blank: the column exists to show that a
+           resource nobody holds is nobody's, not that a number failed to load. */
+        <span>
+          {fila.idsUsuariosAsignados.length}{" "}
+          {fila.idsUsuariosAsignados.length === 1 ? "usuario" : "usuarios"}
+        </span>
+      ),
     },
     {
       key: "acciones",
@@ -364,9 +394,6 @@ export function CatalogoAdmin({ enlaces, procesadores }: CatalogoAdminProps) {
     <>
       <header className={styles.header}>
         <div className={styles.headerTexto}>
-          <p className="lx-label" style={{ color: "var(--navy-fg)" }}>
-            Administración
-          </p>
           <h1>Catálogo de recursos</h1>
           <p className="lx-meta">
             Aplicaciones, agentes de IA y procesadores del portal, en una sola lista. Los cambios se
@@ -423,6 +450,25 @@ export function CatalogoAdmin({ enlaces, procesadores }: CatalogoAdminProps) {
             enviando={enviando}
             onSubmit={guardarProcesador}
             onCancelar={() => setDialogo(null)}
+          />
+        </Modal>
+      ) : null}
+
+      {asignando ? (
+        <Modal title={`Accesos a ${asignando.nombre}`} onClose={() => setClaveAsignando(null)}>
+          {/* Remount on the row identity so a stale confirmations map never
+              carries between two resources. */}
+          <AsignarRecurso
+            key={asignando.clave}
+            recurso={{
+              clase: asignando.clase,
+              id: asignando.id,
+              nombre: asignando.nombre,
+              activo: asignando.activo,
+            }}
+            usuarios={usuarios}
+            asignados={asignando.idsUsuariosAsignados}
+            onCambio={() => router.refresh()}
           />
         </Modal>
       ) : null}

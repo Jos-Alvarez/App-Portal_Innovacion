@@ -1,8 +1,10 @@
 import { Topbar } from "@/components/topbar/topbar";
+import { asignadosPorRecurso } from "@/lib/asignaciones/repository";
 import { guardPageAdmin } from "@/lib/authz";
 import { listarEnlaces } from "@/lib/enlaces/repository";
 import { prisma } from "@/lib/prisma";
 import { listarProcesadores } from "@/lib/procesadores/repository";
+import { listarUsuarios } from "@/lib/usuarios/repository";
 
 import { CatalogoAdmin } from "./catalogo-admin";
 
@@ -50,10 +52,26 @@ export default async function CatalogoAdminPage() {
    * awaiting them in sequence would add the slower one's latency to the faster
    * one's for no reason.
    */
-  const [enlaces, procesadores] = await Promise.all([
+  const [enlaces, procesadores, usuarios, asignadosEnlace, asignadosProcesador] = await Promise.all([
     listarEnlaces(prisma),
     listarProcesadores(prisma),
+    listarUsuarios(prisma),
+    asignadosPorRecurso(prisma, "enlace"),
+    asignadosPorRecurso(prisma, "procesador"),
   ]);
+
+  /*
+   * One flat record keyed by catalogue `clave` — `enlace:7`, `procesador:4` —
+   * because the two id spaces overlap and only the class tells them apart. The
+   * client screen reads a missing key as an empty list: no users, count zero.
+   */
+  const asignados: Record<string, readonly number[]> = {};
+  for (const [id, ids] of asignadosEnlace) {
+    asignados[`enlace:${id}`] = ids;
+  }
+  for (const [id, ids] of asignadosProcesador) {
+    asignados[`procesador:${id}`] = ids;
+  }
 
   return (
     <main className="lx-main">
@@ -65,7 +83,12 @@ export default async function CatalogoAdminPage() {
       {/* El encabezado lo dibuja la pantalla cliente, y no esta página como en
           el resto del panel, porque las dos altas viven en su misma banda y son
           estado del cliente: abren cada una su diálogo. */}
-      <CatalogoAdmin enlaces={enlaces} procesadores={procesadores} />
+      <CatalogoAdmin
+        enlaces={enlaces}
+        procesadores={procesadores}
+        usuarios={usuarios}
+        asignadosPorRecurso={asignados}
+      />
     </main>
   );
 }

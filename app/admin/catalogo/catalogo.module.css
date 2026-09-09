@@ -147,18 +147,6 @@
   font-weight: 600;
 }
 
-/* The registry key of ADR 0006: it is an identifier, so it is set as one. */
-.clave {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: var(--fs-body-sm);
-}
-
-.limites {
-  display: grid;
-  gap: 2px;
-  font-size: var(--fs-body-sm);
-}
-
 /* Wide URLs must not push the row's actions off screen. */
 .direccion {
   display: inline-block;
@@ -167,12 +155,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   vertical-align: bottom;
-}
-
-/* La celda que no aplica a este recurso. Es una raya tenue y no un hueco: un
-   <td> vacío se lee igual que un dato que falta, y esto no falta. */
-.noAplica {
-  color: var(--muted);
 }
 
 .filaAcciones {
@@ -195,4 +177,95 @@
 
 .destructivo:hover:not(:disabled) {
   background: var(--danger-bg);
+}
+
+/* ── El diálogo «Asignar» sobre una fila del catálogo ────────────────────
+   Dos vistas dentro de un mismo Modal: «Con acceso» (quién tiene el recurso,
+   con «Quitar») y el selector de colaboradores del portal. Filas con borde y
+   radio como los resultados de búsqueda de la pantalla de administradores;
+   cada cambio se aplica al toque y lo confirma un Toast. */
+.asignar {
+  display: grid;
+  gap: 18px;
+}
+
+.asignarGrupo {
+  display: grid;
+  gap: 12px;
+}
+
+/* Encabezado del panel y su única acción en una misma banda — la misma forma
+   que la cabecera de la pantalla ("Catálogo de recursos" + "+ Nuevo enlace"). */
+.asignarBanda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.asignarSubtitulo {
+  margin: 0;
+  font-size: var(--fs-body);
+  font-weight: 700;
+}
+
+.asignarLista {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* El padrón entero cabe en una lista que se desplaza dentro del diálogo, no
+   en una tarjeta que crece hasta empujar los botones fuera de la ventana. */
+.asignarListaScroll {
+  max-height: 44vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.asignarFila {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.asignarPersona {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.asignarNombre {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asignarNombre[data-baja] {
+  opacity: 0.55;
+}
+
+.asignarCorreo {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asignarEstado {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  white-space: nowrap;
 }
