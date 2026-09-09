@@ -97,6 +97,63 @@ export async function listarUsuarios(client: UsuariosClient): Promise<UsuarioLis
   }));
 }
 
+/** One account as `POST /api/personas` hands it back once it exists. */
+export interface UsuarioRegistradoDTO {
+  id: number;
+  nombre: string;
+  correo: string;
+  area: string;
+  esAdmin: boolean;
+  activo: boolean;
+}
+
+/**
+ * The portal account for a corporate address — found if it is already there,
+ * created if it is not.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ *  THIS IS WHAT MAKES A GRANT SURVIVE UNTIL ITS OWNER ARRIVES
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * A `usuario` row is normally written by the sign-in and by nothing else
+ * (ADR 0009). That leaves one thing impossible: giving somebody their accesses
+ * BEFORE their first visit, so the portal is already useful the moment they
+ * open it. This function is the exception that makes it possible, and it is
+ * safe for exactly one reason — `lib/auth/usuario-repository.ts` keys its own
+ * upsert on `correo`, so the row created here is the row that login FINDS. It
+ * refreshes the name and the area from Entra ID and leaves the id, the `activo`
+ * flag and every `asignacion_*` row untouched. The accesses are waiting.
+ *
+ * THE CALLER MUST PASS A NORMALIZED ADDRESS. `registrarPersonaSchema` does it,
+ * with the same `normalizeEmail` the login uses. A row keyed on a different
+ * case would never be matched and the grants on it would be orphaned in
+ * silence — which is why the normalization is in the schema, before anything
+ * can reach this function without it.
+ *
+ * NOTHING IS UPDATED when the row already exists, matching
+ * `promoverAAdministrador`: the name and the area of somebody who has signed in
+ * belong to their own login, and overwriting them with what a directory search
+ * returned would make this a second, worse source of identity. `esAdmin` and
+ * `activo` are never written here at all — this function grants no role and
+ * resurrects no baja.
+ *
+ * IDEMPOTENT, so two administrators pre-registering the same colleague at the
+ * same instant both succeed and both get the same row.
+ */
+export async function registrarUsuario(
+  client: UsuariosClient,
+  persona: { correo: string; nombre: string; area: string },
+): Promise<UsuarioRegistradoDTO> {
+  const fila = await client.usuario.upsert({
+    where: { correo: persona.correo },
+    create: { correo: persona.correo, nombre: persona.nombre, area: persona.area },
+    update: {},
+    select: SELECT_IDENTIDAD,
+  });
+
+  return { ...fila, area: normalizarArea(fila.area) };
+}
+
 /**
  * One account and the identifiers of everything granted to it, or `null`.
  *

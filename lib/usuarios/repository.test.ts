@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { type UsuariosClient, leerUsuarioConAsignaciones, listarUsuarios } from "./repository";
+import {
+  type UsuariosClient,
+  leerUsuarioConAsignaciones,
+  listarUsuarios,
+  registrarUsuario,
+} from "./repository";
 
 /**
  * The two reads the assignment screens perform.
@@ -130,5 +135,76 @@ describe("leerUsuarioConAsignaciones", () => {
     const usuario = await leerUsuarioConAsignaciones(cliente, 8);
 
     expect(usuario).toMatchObject({ activo: false, enlaces: [], procesadores: [] });
+  });
+});
+
+describe("registrarUsuario", () => {
+  function clienteAlta(row: unknown) {
+    const upsert = vi.fn().mockResolvedValue(row);
+    return { cliente: { usuario: { upsert } } as unknown as UsuariosClient, upsert };
+  }
+
+  const FILA = {
+    id: 42,
+    nombre: "Sheyla Paz",
+    correo: "sheyla.paz@limaexpresa.pe",
+    area: "Operaciones",
+    esAdmin: false,
+    activo: true,
+  };
+
+  it("keys the row on the address, which is what makes the login find it later", async () => {
+    const { cliente, upsert } = clienteAlta(FILA);
+
+    await registrarUsuario(cliente, {
+      correo: "sheyla.paz@limaexpresa.pe",
+      nombre: "Sheyla Paz",
+      area: "Operaciones",
+    });
+
+    const [consulta] = upsert.mock.calls[0] as [{ where: unknown; create: unknown }];
+    /* `lib/auth/usuario-repository.ts` upserts on this same column, so this row
+       is the one the first sign-in updates instead of duplicating. */
+    expect(consulta.where).toEqual({ correo: "sheyla.paz@limaexpresa.pe" });
+    expect(consulta.create).toEqual({
+      correo: "sheyla.paz@limaexpresa.pe",
+      nombre: "Sheyla Paz",
+      area: "Operaciones",
+    });
+  });
+
+  it("writes neither the role nor the baja flag: it grants nothing and revives nobody", async () => {
+    const { cliente, upsert } = clienteAlta(FILA);
+
+    await registrarUsuario(cliente, { correo: FILA.correo, nombre: "X", area: "" });
+
+    const [consulta] = upsert.mock.calls[0] as [{ create: Record<string, unknown> }];
+    expect(consulta.create).not.toHaveProperty("esAdmin");
+    expect(consulta.create).not.toHaveProperty("activo");
+  });
+
+  it("touches nothing when the account is already there — its login owns its identity", async () => {
+    const { cliente, upsert } = clienteAlta(FILA);
+
+    await registrarUsuario(cliente, { correo: FILA.correo, nombre: "Nombre viejo", area: "Otra" });
+
+    const [consulta] = upsert.mock.calls[0] as [{ update: unknown }];
+    expect(consulta.update).toEqual({});
+  });
+
+  it("gives back the account with its id, so a grant has something to hang on", async () => {
+    const { cliente } = clienteAlta(FILA);
+
+    expect(await registrarUsuario(cliente, { correo: FILA.correo, nombre: "S", area: "" })).toEqual(
+      FILA,
+    );
+  });
+
+  it("reads a NULL area as the empty bucket, like every other read here", async () => {
+    const { cliente } = clienteAlta({ ...FILA, area: null });
+
+    const usuario = await registrarUsuario(cliente, { correo: FILA.correo, nombre: "S", area: "" });
+
+    expect(usuario.area).toBe("");
   });
 });
