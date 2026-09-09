@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import useSWR from "swr";
 
-import { StatusChip } from "@/components/chip/chip";
+import { FilterChip, StatusChip } from "@/components/chip/chip";
 import { EmptyState } from "@/components/states/empty-state";
-import { Table, type TableColumn } from "@/components/table/table";
-import type { RecursoAsignado } from "@/lib/mis-recursos/repository";
+import type { RecursoAsignado, TipoRecursoAsignado } from "@/lib/mis-recursos/repository";
 
 import { ETIQUETA_RECURSO, TONO_RECURSO } from "./etiquetas";
 import {
@@ -55,7 +55,7 @@ import styles from "./portal.module.css";
  * `data` is whatever SWR last resolved successfully — the server's list until a
  * revalidation replaces it — and `error` is the last failure. They coexist on
  * purpose: when a refresh fails, SWR hands back the previous `data` AND the
- * error, so the table keeps rendering rows that are still perfectly usable while
+ * error, so the grid keeps rendering cards that are still perfectly usable while
  * a line above it says the list may be out of date.
  *
  * The fetcher's job is to make that distinction possible: it throws on every
@@ -100,7 +100,7 @@ const VACIO_DESCRIPCION =
   "portal. En cuanto te asignen alguno, aparecerá aquí.";
 
 /**
- * The action of one row.
+ * The action of one card.
  *
  * An `app` and an `agente` are opened the same way — the repository's own
  * comment says so — so the only branch here is between opening an address and
@@ -135,7 +135,7 @@ function accion(recurso: RecursoAsignado) {
       <Link
         className="lx-btn lx-btn-secondary"
         href={`/procesadores/${recurso.id}`}
-        /* Every row's action says the same word; the name is what tells them
+        /* Every card's action says the same word; the name is what tells them
            apart for anyone navigating by link. */
         aria-label={`Ejecutar ${recurso.nombre}`}
       >
@@ -163,47 +163,74 @@ function accion(recurso: RecursoAsignado) {
      * elsewhere (reverse tabnabbing).
      *
      * Secondary and not primary: DESIGN.md allows "una acción primaria (navy)
-     * por vista", and a table of ten rows would otherwise carry ten of them.
+     * por vista", and a grid of ten cards would otherwise carry ten of them.
      */
     <a
       className="lx-btn lx-btn-secondary"
       href={`/api/enlaces/${recurso.id}/abrir`}
       target="_blank"
       rel="noopener noreferrer"
-      /* Every row's action says "Abrir"; the name is what tells them apart for
+      /* Every card's action says "Abrir"; the name is what tells them apart for
          anyone navigating by link, and the new tab is worth announcing. */
       aria-label={`Abrir ${recurso.nombre} en una pestaña nueva`}
     >
       Abrir
+      {/* Iconografía FUNCIONAL, la única que DESIGN.md admite: dice que el clic
+          se va del portal. El `aria-label` de arriba ya lo cuenta en palabras,
+          así que para la tecnología asistiva esto sobra. */}
+      <span aria-hidden="true"> ↗</span>
     </a>
   );
 }
 
-const COLUMNAS: readonly TableColumn<RecursoAsignado>[] = [
-  {
-    key: "nombre",
-    header: "Recurso",
-    cell: (recurso) => (
-      <span className={styles.nombre}>
-        <span className={styles.nombreTexto}>{recurso.nombre}</span>
-        {recurso.descripcion ? <span className="lx-meta">{recurso.descripcion}</span> : null}
-      </span>
-    ),
-  },
-  {
-    key: "tipo",
-    header: "Tipo",
-    cell: (recurso) => (
-      <StatusChip tone={TONO_RECURSO[recurso.tipo]}>{ETIQUETA_RECURSO[recurso.tipo]}</StatusChip>
-    ),
-  },
-  {
-    key: "accion",
-    header: "Acción",
-    align: "end",
-    cell: accion,
-  },
-];
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ *  POR QUÉ ESTO DEJÓ DE SER UNA TABLA
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * Una tabla sirve para COMPARAR filas por sus columnas: se lee en vertical, una
+ * columna a la vez, y gana cuando hay muchas filas y la pregunta es «cuál de
+ * todas». Esta pantalla no es eso. El colaborador tiene tres o cuatro recursos,
+ * ya sabe cuál quiere, y lo que necesita de cada uno es qué hace y cómo entrar
+ * — dos cosas que en la tabla quedaban apretadas en una celda y en un botón al
+ * otro extremo de la fila.
+ *
+ * La tarjeta las pone juntas y le da a cada recurso el tamaño de un objeto en
+ * vez del de un renglón. Y como el catálogo tiene tres clases con significados
+ * distintos, cada tarjeta lleva el color de la suya en el borde superior: el
+ * tipo se reconoce antes de leer el chip.
+ *
+ * SIN ICONOS DECORATIVOS. DESIGN.md los admite «solo como iconografía funcional
+ * discreta (⇄, 🔒, ⚠); no decorativos», así que el único glifo de la pantalla
+ * es el `↗` de la acción que se va del portal — dice a dónde lleva el clic, no
+ * adorna la tarjeta.
+ */
+
+/** El orden en que se muestran las clases, para que los filtros no bailen. */
+const ORDEN_TIPOS: readonly TipoRecursoAsignado[] = ["app", "agente", "procesador"];
+
+/** Los filtros en plural, que es como se nombra un conjunto y no un elemento. */
+const ETIQUETA_FILTRO: Record<TipoRecursoAsignado, string> = {
+  app: "Aplicaciones",
+  agente: "Agentes de IA",
+  procesador: "Procesadores",
+};
+
+const TODOS = "todos" as const;
+type Filtro = typeof TODOS | TipoRecursoAsignado;
+
+/**
+ * Lo que la tarjeta dice de su acción antes de que la toquen.
+ *
+ * Las dos son distintas de verdad y el lector merece saber cuál le toca: una se
+ * va del portal a otra pestaña, la otra abre una pantalla de trabajo acá mismo.
+ * `accion` explica por qué esa diferencia también cambia el elemento.
+ */
+const PISTA: Record<TipoRecursoAsignado, string> = {
+  app: "Se abre en una pestaña nueva",
+  agente: "Se abre en una pestaña nueva",
+  procesador: "Se ejecuta aquí, en el portal",
+};
 
 export function MisRecursos({ recursosIniciales }: MisRecursosProps) {
   const { data, error } = useSWR<readonly RecursoAsignado[]>(
@@ -215,6 +242,34 @@ export function MisRecursos({ recursosIniciales }: MisRecursosProps) {
   /* `fallbackData` guarantees a value from the first render, so this is a
      type-level fallback and not a state the reader can ever see. */
   const recursos = data ?? recursosIniciales;
+
+  const [filtro, setFiltro] = useState<Filtro>(TODOS);
+
+  /*
+   * LOS FILTROS SALEN DE LA LISTA, NO DE LA LISTA DE TIPOS POSIBLES. Un chip
+   * que no puede devolver nada es una promesa vacía: quien tiene dos apps no
+   * necesita que el portal le ofrezca filtrar por procesadores para descubrir
+   * que no tiene ninguno. Y como cada chip existe solo si hay al menos una
+   * tarjeta suya, ningún filtro puede dejar la grilla vacía — por eso esta
+   * pantalla no necesita un estado de «sin resultados».
+   */
+  const tiposPresentes = ORDEN_TIPOS.filter((tipo) =>
+    recursos.some((recurso) => recurso.tipo === tipo),
+  );
+
+  /*
+   * Una revalidación puede llevarse el último recurso de la clase filtrada
+   * mientras el lector la tiene elegida — un acceso que alguien revocó del otro
+   * lado. Sin esto el chip desaparecería y la grilla quedaría vacía sin que
+   * nada explique por qué. React's "adjust state when a prop changes", durante
+   * el render.
+   */
+  if (filtro !== TODOS && !tiposPresentes.includes(filtro)) {
+    setFiltro(TODOS);
+  }
+
+  const visibles =
+    filtro === TODOS ? recursos : recursos.filter((recurso) => recurso.tipo === filtro);
 
   return (
     <>
@@ -238,21 +293,66 @@ export function MisRecursos({ recursosIniciales }: MisRecursosProps) {
       ) : (
         <>
           {/*
-            * The note that used to sit under this table — explaining that
-            * procesadores were assigned but not yet runnable — went away with
-            * item #10, along with the wait it was apologising for. Every row in
-            * this list now has an action that works.
+            * Los chips aparecen solo cuando hay más de una clase que separar:
+            * con tres apps y nada más, «Todos» y «Aplicaciones» devuelven lo
+            * mismo, y un filtro que no filtra es un control que hay que leer
+            * para descubrir que no hacía falta.
+            *
+            * DESIGN.md "Chips de filtro": pill, activo = navy relleno.
+            * `FilterChip` lleva el `aria-pressed` que le dice a la tecnología
+            * asistiva cuál está puesto.
             */}
-          <div className={styles.tabla}>
-            <Table
-              caption="Recursos asignados a tu cuenta"
-              columns={COLUMNAS}
-              rows={recursos}
-              /* ADR 0002 keeps enlaces and procesadores in different tables, so
-                 an id can repeat across them: the pair is the identity. */
-              rowKey={(recurso) => `${recurso.tipo}-${recurso.id}`}
-            />
-          </div>
+          {tiposPresentes.length > 1 ? (
+            <div className={styles.filtros} role="group" aria-label="Filtrar por tipo de recurso">
+              <FilterChip
+                label="Todos"
+                selected={filtro === TODOS}
+                onSelect={() => setFiltro(TODOS)}
+              />
+              {tiposPresentes.map((tipo) => (
+                <FilterChip
+                  key={tipo}
+                  label={ETIQUETA_FILTRO[tipo]}
+                  selected={filtro === tipo}
+                  onSelect={() => setFiltro(tipo)}
+                />
+              ))}
+            </div>
+          ) : null}
+
+          <ul className={styles.grilla} aria-label="Recursos asignados a tu cuenta">
+            {visibles.map((recurso) => (
+              <li
+                /* ADR 0002 keeps enlaces and procesadores in different tables, so
+                   an id can repeat across them: the pair is the identity. */
+                key={`${recurso.tipo}-${recurso.id}`}
+                className={styles.tarjeta}
+                /* De acá sale el color del borde superior: la clase se reconoce
+                   antes de leer el chip. */
+                data-tipo={recurso.tipo}
+              >
+                <StatusChip tone={TONO_RECURSO[recurso.tipo]}>
+                  {ETIQUETA_RECURSO[recurso.tipo]}
+                </StatusChip>
+
+                {/* `h2` bajo el «Hola, …» de la página: la grilla es una lista de
+                    secciones navegables por encabezado, no un párrafo en negrita. */}
+                <h2 className={styles.tarjetaNombre}>{recurso.nombre}</h2>
+
+                {recurso.descripcion ? (
+                  <p className={styles.tarjetaDescripcion}>{recurso.descripcion}</p>
+                ) : null}
+
+                {/* `margin-top: auto` en el CSS lo empuja abajo, así que todas las
+                    acciones quedan alineadas aunque las descripciones midan
+                    distinto. */}
+                <div className={styles.tarjetaPie}>
+                  <span className="lx-meta">{PISTA[recurso.tipo]}</span>
+                  {accion(recurso)}
+                </div>
+              </li>
+            ))}
+          </ul>
         </>
       )}
     </>

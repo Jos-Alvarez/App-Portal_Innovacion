@@ -1,4 +1,5 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { SWRConfig } from "swr";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -73,9 +74,23 @@ function montar(recursosIniciales: readonly RecursoAsignado[]): ReactNode {
   );
 }
 
-/** The row whose accessible name contains this resource's name. */
-function fila(nombre: string): HTMLElement {
-  return screen.getByRole("row", { name: new RegExp(nombre, "i") });
+/**
+ * La tarjeta de un recurso, buscada por su encabezado.
+ *
+ * Y no `getByRole("listitem", { name })`: un `listitem` no toma su nombre
+ * accesible del contenido — solo un `aria-label` se lo daría, y ponerle uno
+ * igual al `h2` que ya tiene adentro haría que se anuncie dos veces. El
+ * encabezado sí lleva el nombre, así que se busca ese y se sube a su tarjeta.
+ */
+function tarjeta(nombre: string): HTMLElement {
+  const titulo = screen.getByRole("heading", { name: new RegExp(nombre, "i") });
+  const contenedor = titulo.closest("li");
+
+  if (contenedor === null) {
+    throw new Error(`La tarjeta de «${nombre}» no está dentro de la grilla`);
+  }
+
+  return contenedor;
 }
 
 describe("MisRecursos", () => {
@@ -89,7 +104,7 @@ describe("MisRecursos", () => {
   });
 
   describe("lo que se ve por tipo de recurso", () => {
-    it("lista los tres tipos en una sola tabla", () => {
+    it("lista los tres tipos en una sola grilla", () => {
       render(montar([AGENTE, PROCESADOR, APP]));
 
       expect(screen.getByText("Portal de Compras")).toBeInTheDocument();
@@ -97,27 +112,143 @@ describe("MisRecursos", () => {
       expect(screen.getByText("Maestro de Excel")).toBeInTheDocument();
     });
 
-    it("pone en cada fila el chip que nombra su tipo", () => {
+    it("pone en cada tarjeta el chip que nombra su tipo", () => {
       render(montar([APP, AGENTE, PROCESADOR]));
 
-      expect(within(fila("Portal de Compras")).getByText("Aplicación")).toBeInTheDocument();
-      expect(within(fila("Asistente de Contratos")).getByText("Agente de IA")).toBeInTheDocument();
-      expect(within(fila("Maestro de Excel")).getByText("Procesador")).toBeInTheDocument();
+      expect(within(tarjeta("Portal de Compras")).getByText("Aplicación")).toBeInTheDocument();
+      expect(within(tarjeta("Asistente de Contratos")).getByText("Agente de IA")).toBeInTheDocument();
+      expect(within(tarjeta("Maestro de Excel")).getByText("Procesador")).toBeInTheDocument();
     });
 
     it("muestra la descripción cuando la hay y no inventa nada cuando no", () => {
       render(montar([APP, AGENTE]));
 
       expect(screen.getByText("Solicitudes y órdenes de compra")).toBeInTheDocument();
-      /* The agente has none: its row carries its name and its chip, nothing else. */
-      expect(within(fila("Asistente de Contratos")).getByText("Agente de IA")).toBeInTheDocument();
+      /* The agente has none: its card carries its name and its chip, nothing else. */
+      expect(within(tarjeta("Asistente de Contratos")).getByText("Agente de IA")).toBeInTheDocument();
     });
 
     it("distingue un enlace y un procesador que comparten el id", () => {
       /* ADR 0002 keeps them in different tables, so `id` alone is not a key. */
       render(montar([APP, PROCESADOR]));
 
-      expect(screen.getAllByRole("row")).toHaveLength(3); /* cabecera + dos filas */
+      expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    });
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   *  LOS FILTROS SALEN DE LA LISTA, NO DE LA LISTA DE TIPOS POSIBLES
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Un chip que no puede devolver nada es una promesa vacía. Y como cada chip
+   * existe solo si hay al menos una tarjeta suya, ningún filtro puede dejar la
+   * grilla vacía — por eso esta pantalla no tiene un estado de «sin
+   * resultados» que probar.
+   */
+  describe("los filtros por tipo", () => {
+    it("ofrece un chip por cada clase presente, y ninguno más", () => {
+      render(montar([APP, PROCESADOR]));
+
+      const filtros = within(screen.getByRole("group", { name: /filtrar por tipo/i }));
+
+      expect(filtros.getByRole("button", { name: "Todos" })).toBeInTheDocument();
+      expect(filtros.getByRole("button", { name: "Aplicaciones" })).toBeInTheDocument();
+      expect(filtros.getByRole("button", { name: "Procesadores" })).toBeInTheDocument();
+      /* No hay ningún agente asignado: ofrecer el chip sería ofrecer un vacío. */
+      expect(filtros.queryByRole("button", { name: "Agentes de IA" })).not.toBeInTheDocument();
+    });
+
+    it("no dibuja filtros cuando hay una sola clase: no habría nada que separar", () => {
+      render(montar([APP, { ...APP, id: 99, nombre: "Otra App" }]));
+
+      expect(screen.queryByRole("group", { name: /filtrar por tipo/i })).not.toBeInTheDocument();
+    });
+
+    it("deja en la grilla solo la clase elegida", async () => {
+      const user = userEvent.setup();
+      render(montar([APP, AGENTE, PROCESADOR]));
+
+      await user.click(screen.getByRole("button", { name: "Procesadores" }));
+
+      expect(screen.getByRole("heading", { name: "Maestro de Excel" })).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Portal de Compras" })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("heading", { name: "Asistente de Contratos" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("dice cuál está puesto, que es lo que lee la tecnología asistiva", async () => {
+      const user = userEvent.setup();
+      render(montar([APP, PROCESADOR]));
+
+      expect(screen.getByRole("button", { name: "Todos" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+
+      await user.click(screen.getByRole("button", { name: "Aplicaciones" }));
+
+      expect(screen.getByRole("button", { name: "Aplicaciones" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      expect(screen.getByRole("button", { name: "Todos" })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
+    });
+
+    it("vuelve a «Todos» cuando una revalidación se lleva la clase filtrada", async () => {
+      /*
+       * Alguien revocó el último procesador del otro lado mientras el lector lo
+       * tenía filtrado. Sin la vuelta a «Todos», el chip desaparecería y la
+       * grilla quedaría vacía sin que nada explique por qué.
+       */
+      const user = userEvent.setup();
+      obtenerMisRecursos.mockResolvedValue([APP]);
+      render(montar([APP, PROCESADOR]));
+
+      await user.click(screen.getByRole("button", { name: "Procesadores" }));
+      expect(screen.queryByRole("heading", { name: "Portal de Compras" })).not.toBeInTheDocument();
+
+      revalidarPorFoco();
+
+      /* Se fue el procesador, se fueron los filtros, y la app vuelve a verse
+         en vez de dejar una grilla vacía sin explicación. */
+      await waitFor(() =>
+        expect(screen.getByRole("heading", { name: "Portal de Compras" })).toBeInTheDocument(),
+      );
+      expect(screen.queryByRole("group", { name: /filtrar por tipo/i })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("la tarjeta", () => {
+    it("marca su clase también en el borde, no solo en el chip", () => {
+      render(montar([APP, AGENTE, PROCESADOR]));
+
+      /* El color sale del CSS; lo que el marcado tiene que garantizar es que la
+         clase esté ahí para que una regla pueda leerla. */
+      expect(tarjeta("Portal de Compras")).toHaveAttribute("data-tipo", "app");
+      expect(tarjeta("Asistente de Contratos")).toHaveAttribute("data-tipo", "agente");
+      expect(tarjeta("Maestro de Excel")).toHaveAttribute("data-tipo", "procesador");
+    });
+
+    it("dice a dónde lleva su acción antes de que la toquen", () => {
+      render(montar([APP, PROCESADOR]));
+
+      expect(
+        within(tarjeta("Portal de Compras")).getByText("Se abre en una pestaña nueva"),
+      ).toBeInTheDocument();
+      expect(
+        within(tarjeta("Maestro de Excel")).getByText("Se ejecuta aquí, en el portal"),
+      ).toBeInTheDocument();
+    });
+
+    it("nombra cada recurso como encabezado, no como texto en negrita", () => {
+      render(montar([APP, PROCESADOR]));
+
+      expect(screen.getAllByRole("heading")).toHaveLength(2);
     });
   });
 
@@ -125,7 +256,7 @@ describe("MisRecursos", () => {
     it("apunta a la ruta del portal, nunca al destino externo", () => {
       render(montar([APP]));
 
-      const abrir = within(fila("Portal de Compras")).getByRole("link");
+      const abrir = within(tarjeta("Portal de Compras")).getByRole("link");
 
       expect(abrir).toHaveAttribute("href", "/api/enlaces/4/abrir");
     });
@@ -133,7 +264,7 @@ describe("MisRecursos", () => {
     it("abre en una pestaña nueva sin entregarle el control de esta", () => {
       render(montar([AGENTE]));
 
-      const abrir = within(fila("Asistente de Contratos")).getByRole("link");
+      const abrir = within(tarjeta("Asistente de Contratos")).getByRole("link");
 
       expect(abrir).toHaveAttribute("target", "_blank");
       /* Sin `noopener`, la página abierta puede navegar la pestaña del portal. */
@@ -173,7 +304,7 @@ describe("MisRecursos", () => {
     it("lleva a la pantalla de ejecución del portal", () => {
       render(montar([PROCESADOR]));
 
-      const ejecutar = within(fila("Maestro de Excel")).getByRole("link");
+      const ejecutar = within(tarjeta("Maestro de Excel")).getByRole("link");
 
       expect(ejecutar).toHaveAttribute("href", "/procesadores/4");
     });
@@ -186,7 +317,7 @@ describe("MisRecursos", () => {
     it("se queda en la misma pestaña, al contrario que un enlace externo", () => {
       render(montar([PROCESADOR]));
 
-      const ejecutar = within(fila("Maestro de Excel")).getByRole("link");
+      const ejecutar = within(tarjeta("Maestro de Excel")).getByRole("link");
 
       expect(ejecutar).not.toHaveAttribute("target");
     });
@@ -199,7 +330,7 @@ describe("MisRecursos", () => {
       ).toBeInTheDocument();
     });
 
-    it("ya no explica ninguna espera debajo de la tabla", () => {
+    it("ya no explica ninguna espera debajo de la grilla", () => {
       render(montar([PROCESADOR, APP]));
 
       expect(screen.queryByText(/el Área de Innovación te avisará/i)).not.toBeInTheDocument();
@@ -207,10 +338,10 @@ describe("MisRecursos", () => {
   });
 
   describe("el estado vacío", () => {
-    it("no dibuja una tabla sin filas", () => {
+    it("no dibuja una grilla sin tarjetas", () => {
       render(montar([]));
 
-      expect(screen.queryByRole("table")).not.toBeInTheDocument();
+      expect(screen.queryByRole("list")).not.toBeInTheDocument();
     });
 
     it("dice qué falta y quién lo resuelve, sin culpar a nadie", () => {
@@ -324,7 +455,7 @@ describe("MisRecursos", () => {
       /* Lo que importa: las filas siguen ahí y siguen siendo usables. */
       expect(screen.getByText("Portal de Compras")).toBeInTheDocument();
       expect(screen.getByText("Maestro de Excel")).toBeInTheDocument();
-      expect(within(fila("Portal de Compras")).getByRole("link")).toHaveAttribute(
+      expect(within(tarjeta("Portal de Compras")).getByRole("link")).toHaveAttribute(
         "href",
         "/api/enlaces/4/abrir",
       );

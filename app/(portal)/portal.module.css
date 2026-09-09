@@ -1,21 +1,14 @@
 /*
  * The collaborator's dashboard. Like the admin screens, nothing here is a new
- * component: the table, the chips and the empty state are the shared ones, and
- * this file lays them out and dresses the one thing the components layer does
- * not ship — the stale-list notice. The topbar lockup left this file with item
- * #17, which extracted it into `components/topbar`.
+ * component: the chips and the empty state are the shared ones, and this file
+ * lays them out and dresses the two things the components layer does not ship —
+ * the stale-list notice and the resource card. The topbar lockup left this file
+ * with item #17, which extracted it into `components/topbar`.
  */
 
 .header {
   display: grid;
   gap: 6px;
-}
-
-/* La puerta al buzón (ítem #13). `justify-self` para que el botón mida lo que
-   dice y no el ancho de la columna. */
-.buzon {
-  justify-self: start;
-  margin-top: 4px;
 }
 
 /*
@@ -32,21 +25,136 @@
   font-weight: 600;
 }
 
-.tabla {
-  padding: 8px 24px 16px;
+/* Chips de filtro: pill, activo = navy relleno, inactivo = borde + --muted. */
+.filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/*
+ * ══════════════════════════════════════════════════════════════════════════
+ *  LA GRILLA
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * `auto-fill` con un mínimo de 300px y no un número fijo de columnas: la
+ * cantidad de tarjetas la decide el ancho disponible, así que la misma regla
+ * sirve para tres recursos en un monitor y para uno en un teléfono, sin
+ * media queries que haya que mantener de a pares.
+ *
+ * `align-items: stretch` es lo que hace que todas las tarjetas de una fila
+ * midan lo mismo aunque sus descripciones no; el pie se alinea abajo con su
+ * propio `margin-top: auto`.
+ */
+.grilla {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  align-items: stretch;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/*
+ * Tarjetas: --surface + borde 1px --border + radio 12–16px + --shadow, con el
+ * padding cómodo de 20–28px que pide "Densidad".
+ *
+ * EL BORDE SUPERIOR GRUESO ES EL TIPO. Tres clases de recurso con tres
+ * significados distintos, y el color de cada una ya está definido — el mismo
+ * que lleva su chip. Repetirlo como una franja de 4px hace que la grilla se lea
+ * de un vistazo: se distinguen las clases antes de leer una sola palabra.
+ * `border-top` y no un pseudo-elemento, porque un borde ya ocupa su lugar en la
+ * caja y no hay que compensarlo con padding.
+ */
+.tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 22px 24px 20px;
   border: 1px solid var(--border);
+  border-top: 4px solid var(--cyan);
   border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: var(--shadow);
-  overflow-x: auto;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
 
-.nombre {
-  display: grid;
-  gap: 2px;
+.tarjeta[data-tipo="agente"] {
+  border-top-color: var(--agent);
 }
 
-.nombreTexto {
-  font-weight: 600;
+.tarjeta[data-tipo="procesador"] {
+  border-top-color: var(--navy);
 }
 
+/*
+ * "Hover de tarjetas interactivas: borde cian + translateY(-2px)".
+ *
+ * El borde superior NO cambia: es el tipo del recurso, no un estado, y teñirlo
+ * de cian al pasar el mouse borraría la única marca que distingue un agente de
+ * un procesador justo cuando el lector está por elegir uno.
+ */
+.tarjeta:hover {
+  border-inline-color: var(--cyan);
+  border-bottom-color: var(--cyan);
+  transform: translateY(-2px);
+}
+
+/*
+ * El foco del teclado vive en el botón de adentro, que trae el suyo. Lo que
+ * hace esto es que la tarjeta acompañe: sin ello, tabular por la grilla mueve
+ * un anillo por tarjetas que parecen todas iguales.
+ */
+.tarjeta:focus-within {
+  border-inline-color: var(--cyan);
+  border-bottom-color: var(--cyan);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tarjeta {
+    transition: none;
+  }
+
+  .tarjeta:hover {
+    transform: none;
+  }
+}
+
+/*
+ * El nombre del recurso. 17px en 700 lo pone por encima del cuerpo sin llegar
+ * al título de pantalla (24px), que sigue siendo el saludo: la jerarquía de la
+ * página no cambia porque las tarjetas crezcan.
+ */
+.tarjetaNombre {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+.tarjetaDescripcion {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-body-sm);
+  line-height: 1.5;
+}
+
+/*
+ * `margin-top: auto` empuja el pie contra el borde inferior, que es lo que
+ * alinea todas las acciones de una fila aunque las descripciones midan
+ * distinto. El borde de arriba lo separa del texto sin encerrarlo en una caja.
+ */
+.tarjetaPie {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
