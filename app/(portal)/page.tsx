@@ -1,10 +1,12 @@
-import Link from "next/link";
+import { redirect } from "next/navigation";
 
+import { RUTA_INICIO_ADMIN } from "@/components/topbar/rutas";
 import { Topbar } from "@/components/topbar/topbar";
 import { guardPage } from "@/lib/authz";
 import { listarRecursosAsignados } from "@/lib/mis-recursos/repository";
 import { prisma } from "@/lib/prisma";
 
+import { saludo } from "./etiquetas";
 import { MisRecursos } from "./mis-recursos";
 import styles from "./portal.module.css";
 
@@ -68,6 +70,29 @@ export default async function PortalPage() {
     return acceso.screen;
   }
 
+  /*
+   * ══════════════════════════════════════════════════════════════════════════
+   *  ESTA PANTALLA NO ES DE QUIEN ADMINISTRA
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Quien administra arma el catálogo y lo reparte; no usa las herramientas que
+   * reparte. «Mis recursos» le mostraba una lista que —por ADR 0007, que le
+   * niega toda asignación implícita— o está vacía o contiene lo poco que
+   * alguien le asignó a mano, y en ninguno de los dos casos es su trabajo.
+   *
+   * REDIRIGE, NO NIEGA. `lib/authz/index.ts` prohíbe esconder detrás de un
+   * redirect un recurso al que falta permiso, y hace bien; acá no falta ninguno.
+   * La pantalla simplemente no existe para quien mira, y el proxy lo devuelve a
+   * `/` después de iniciar sesión, así que este es el salto que lo deja en su
+   * casa. `rutas.ts` lo explica entero.
+   *
+   * ANTES DE LEER, como el guard: quien nunca va a ver esta lista tampoco la
+   * consulta.
+   */
+  if (acceso.usuario.esAdmin) {
+    redirect(RUTA_INICIO_ADMIN);
+  }
+
   const recursos = await listarRecursosAsignados(prisma, acceso.usuario.id);
 
   return (
@@ -78,39 +103,18 @@ export default async function PortalPage() {
       <Topbar usuario={acceso.usuario} preloadLogo />
 
       <header className={styles.header}>
-        <h1>Mis recursos</h1>
-        <p className="lx-meta">
-          Las aplicaciones, los agentes de IA y los procesadores que el Área de Innovación asignó a
-          tu cuenta.
-        </p>
-
         {/*
-          * ══════════════════════════════════════════════════════════════════
-          *  THE WAY INTO THE BUZÓN (ITEM #13), AND WHY IT IS HERE
-          * ══════════════════════════════════════════════════════════════════
-          *
-          * The suggestions box is open to everyone — the PRD puts it outside
-          * the assignment system entirely — so it needs a door that does not
-          * depend on anything being assigned. This is the screen every
-          * collaborator lands on after signing in, including the ones whose
-          * dashboard is empty, which makes it the one place a link is certain
-          * to be seen.
-          *
-          * STILL NOT IN THE TOPBAR, and now for a different reason. Item #17
-          * extracted the shared `Topbar` this comment asked for, so the old
-          * objection — three copies to edit — is gone. What the bar holds is the
-          * session cluster: who you are, how the portal looks, the role screen
-          * if you administer it, and the way out. The buzón is not about the
-          * session; it is this screen's own invitation, and it belongs beside
-          * the words that explain what the screen is.
-          *
-          * SECONDARY, not primary. DESIGN.md allows "una acción primaria (navy)
-          * por vista"; this view's rows already carry the actions, and the navy
-          * fill belongs to the send button on the screen this link leads to.
+          * EL SALUDO ES EL TÍTULO, y no «Mis recursos», porque la barra ya
+          * nombra la pantalla — la entrada activa dice dónde está el lector, y
+          * repetirlo aquí gasta la línea más grande de la vista en decir dos
+          * veces lo mismo. Lo que esa línea sí puede hacer es hablarle a quien
+          * la lee. `saludo` explica por qué es el primer nombre y no el
+          * `displayName` completo.
           */}
-        <Link className={`lx-btn lx-btn-secondary ${styles.buzon}`} href="/sugerencias">
-          Buzón de sugerencias
-        </Link>
+        <h1>{saludo(acceso.usuario.nombre)}</h1>
+        <p className="lx-meta">
+          Estos son los recursos asignados a tu usuario.
+        </p>
       </header>
 
       <MisRecursos recursosIniciales={recursos} />

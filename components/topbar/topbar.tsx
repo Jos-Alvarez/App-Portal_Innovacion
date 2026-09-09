@@ -1,7 +1,6 @@
-import Link from "next/link";
-
 import { LOGO_SIZE_TOPBAR, Logo } from "@/components/logo/logo";
 import { AdminNav } from "@/components/topbar/admin-nav";
+import { PortalNav } from "@/components/topbar/portal-nav";
 import { SessionMenu } from "@/components/topbar/session-menu";
 
 import styles from "./topbar.module.css";
@@ -104,24 +103,39 @@ export function Topbar({ usuario, preloadLogo = false }: TopbarProps) {
   return (
     <div className={styles.topbar}>
       {/*
-       * The lockup is the way back to the portal, which is the whole reason the
-       * admin screens can wear this bar at all: before it they had no route home
-       * except the browser's own back button, and `/admin/enlaces` reached by a
-       * bookmark had none whatsoever. A logo that leads home is the convention
-       * every reader already knows, so it needs no label of its own beyond the
-       * two words it already carries.
+       * ══════════════════════════════════════════════════════════════════════
+       *  EL LOCKUP DEJÓ DE SER UNA PUERTA
+       * ══════════════════════════════════════════════════════════════════════
+       *
+       * Fue un enlace a `/` mientras esa era la casa de todo el mundo, y ese era
+       * su argumento: las pantallas del panel no tenían más vuelta que el botón
+       * de atrás del navegador, y un logo que lleva a casa es la convención que
+       * cualquiera ya conoce.
+       *
+       * Las dos mitades de ese argumento se cayeron a la vez. `/` ya no es la
+       * casa de quien administra — lo redirige al panel, ver `rutas.ts` —, así
+       * que apuntar ahí lo mandaría de vuelta al lugar del que viene. Y la
+       * vuelta a casa ya no falta: cada audiencia tiene su barra, y la del
+       * colaborador abre con «Mis recursos», que es exactamente ese enlace con
+       * su nombre puesto.
+       *
+       * Sin destino que le pertenezca y sin hueco que tapar, lo que queda es lo
+       * que siempre fue a la vista: el nombre del producto.
        */}
-      <Link className={styles.lockup} href="/">
+      <div className={styles.lockup}>
         <Logo size={LOGO_SIZE_TOPBAR} preload={preloadLogo} />
         <span className={styles.separador} aria-hidden="true" />
         <span className={styles.marca}>Portal de Innovación</span>
-      </Link>
+      </div>
 
       {/*
-       * The five day-to-day screens of the panel, drawn only for administrators.
-       * The sixth — Administradores — is not here; it is in the session menu.
+       * One bar, two audiences. An administrator gets the four screens of the
+       * panel (the fifth — Administradores — is in the session menu); everybody
+       * else gets the two the portal is for them. Never both: six entries in one
+       * row would compete, and «Sugerencias» beside «Buzón de sugerencias» names
+       * one word for two different powers. `portal-nav.tsx` explains the split.
        */}
-      {usuario.esAdmin ? <AdminNav /> : null}
+      {usuario.esAdmin ? <AdminNav /> : <PortalNav />}
 
       {/*
        * The session cluster, now a single trigger: who the portal thinks you are,

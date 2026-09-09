@@ -8,10 +8,6 @@
  * extracted it into `components/topbar`.
  */
 
-.volver {
-  justify-self: start;
-}
-
 .header {
   display: grid;
   gap: 6px;

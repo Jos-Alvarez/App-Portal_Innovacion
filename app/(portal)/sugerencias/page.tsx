@@ -1,6 +1,8 @@
-import Link from "next/link";
+import { redirect } from "next/navigation";
+
 
 import { Topbar } from "@/components/topbar/topbar";
+import { RUTA_SUGERENCIAS_ADMIN } from "@/components/topbar/rutas";
 import { guardPage } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { leerAreaDelAutor, listarSugerenciasDeAutor } from "@/lib/sugerencias/repository";
@@ -68,6 +70,17 @@ export default async function SugerenciasPage() {
     return acceso.screen;
   }
 
+  /*
+   * El buzón es donde un colaborador PROPONE. Quien administra tiene la otra
+   * mitad de esa conversación —`/admin/sugerencias`, todas las de todos, con
+   * los estados y los grupos— y ese es su sitio en ella. Redirige y no niega,
+   * por la misma razón que `/`: no falta un permiso, falta la pantalla.
+   * `rutas.ts` lo explica; el salto va antes de las lecturas.
+   */
+  if (acceso.usuario.esAdmin) {
+    redirect(RUTA_SUGERENCIAS_ADMIN);
+  }
+
   const [sugerencias, areaPropia] = await Promise.all([
     listarSugerenciasDeAutor(prisma, acceso.usuario.id),
     leerAreaDelAutor(prisma, acceso.usuario.id),
@@ -80,11 +93,6 @@ export default async function SugerenciasPage() {
           arrived here from another screen that already loaded the asset. */}
       <Topbar usuario={acceso.usuario} />
 
-      {/* `Link` and not an anchor: this is an internal navigation and the client
-          router should handle it without a full document load. */}
-      <Link className={`lx-btn lx-btn-text ${styles.volver}`} href="/">
-        ← Volver al portal
-      </Link>
 
       <header className={styles.header}>
         <h1>Buzón de sugerencias</h1>

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { esRutaActual } from "@/components/topbar/rutas";
+
 import styles from "./topbar.module.css";
 
 /**
@@ -81,18 +83,18 @@ export const ENLACES_ADMIN = [
   { href: "/admin/analitica", etiqueta: "Analítica" },
 ] as const;
 
-/** Whether a bar entry is the screen being read, `/admin/asignaciones/7` included. */
-export function esRutaActual(href: string, pathname: string | null): boolean {
-  if (pathname === null) return false;
-
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
+/*
+ * Vive en `rutas.ts` desde que hay dos barras — esta y la del colaborador — y
+ * ninguna de las dos es el hogar natural de una regla de la que depende la
+ * otra. Se reexporta para no romper a quien ya la importaba desde aquí.
+ */
+export { esRutaActual };
 
 export function AdminNav() {
   const pathname = usePathname();
 
   return (
-    <nav className={styles.adminNav} aria-label="Administración">
+    <nav className={styles.nav} aria-label="Administración">
       {ENLACES_ADMIN.map(({ href, etiqueta }) => {
         const actual = esRutaActual(href, pathname);
 
@@ -100,7 +102,7 @@ export function AdminNav() {
           <Link
             key={href}
             href={href}
-            className={styles.adminLink}
+            className={styles.navLink}
             /*
              * `page` and not `true`: the reader is on that page, which is the
              * value assistive technology reads as "this is where you are".

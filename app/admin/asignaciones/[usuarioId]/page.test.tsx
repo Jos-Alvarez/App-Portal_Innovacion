@@ -107,11 +107,15 @@ describe("/admin/asignaciones/[usuarioId]", () => {
    * soft navigations and the bar has to be re-rendered by each page's own guard.
    * Asserting it here is what keeps one of the nine copies from being dropped.
    */
-  it("wears the shared topbar, with its way back to the portal", async () => {
+  it("wears the shared topbar, whose brand is a title and not a door", async () => {
     render(await AsignacionesDeUsuarioPage(contexto("7")));
 
     expect(screen.getByText("Rosa Díaz")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /portal de innovación/i })).toHaveAttribute("href", "/");
+    /* La marca es un título, no una puerta: `/` ya no es la casa de quien
+       administra — lo redirige al panel — y la barra le da sus cuatro
+       pantallas. `components/topbar/topbar.tsx` lo explica. */
+    expect(screen.getByText("Portal de Innovación")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /portal de innovación/i })).not.toBeInTheDocument();
   });
 
   /*
@@ -125,6 +129,10 @@ describe("/admin/asignaciones/[usuarioId]", () => {
     render(await AsignacionesDeUsuarioPage(contexto("404")));
 
     expect(screen.getByText("Esa persona ya no está en el portal")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /portal de innovación/i })).toHaveAttribute("href", "/");
+    /* La marca es un título, no una puerta: `/` ya no es la casa de quien
+       administra — lo redirige al panel — y la barra le da sus cuatro
+       pantallas. `components/topbar/topbar.tsx` lo explica. */
+    expect(screen.getByText("Portal de Innovación")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /portal de innovación/i })).not.toBeInTheDocument();
   });
 });

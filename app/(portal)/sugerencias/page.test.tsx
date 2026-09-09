@@ -1,9 +1,20 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const guardPage = vi.fn();
 const listarSugerenciasDeAutor = vi.fn();
 const leerAreaDelAutor = vi.fn();
+
+/* La barra del colaborador lee la ruta actual. Y `redirect` LANZA en Next: el
+   doble tiene que lanzar también, o la página seguiría leyendo y dibujándose. */
+const redirect = vi.fn((destino: string) => {
+  throw new Error(`REDIRECT:${destino}`);
+});
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/sugerencias",
+  redirect: (destino: string) => redirect(destino),
+}));
 
 vi.mock("@/lib/authz", () => ({ guardPage: () => guardPage() }));
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
@@ -34,6 +45,7 @@ const USUARIO = { id: 12, correo: "ana@limaexpresa.pe", nombre: "Ana Quispe", es
 
 describe("/sugerencias (buzón del colaborador)", () => {
   beforeEach(() => {
+    redirect.mockClear();
     guardPage.mockReset();
     listarSugerenciasDeAutor.mockReset().mockResolvedValue([]);
     leerAreaDelAutor.mockReset().mockResolvedValue("Operaciones");
@@ -122,12 +134,37 @@ describe("/sugerencias (buzón del colaborador)", () => {
     ).toBeInTheDocument();
   });
 
-  it("deja una salida de vuelta al portal", async () => {
+  /**
+   * El buzón es donde un colaborador PROPONE. Quien administra tiene la otra
+   * mitad de esa conversación en `/admin/sugerencias` —todas las de todos, con
+   * sus estados y sus grupos— y ahí es donde este salto lo deja.
+   */
+  it("manda a quien administra a las sugerencias del panel, no a su propio buzón", async () => {
+    guardPage.mockResolvedValue({ allowed: true, usuario: { ...USUARIO, esAdmin: true } });
+
+    await expect(SugerenciasPage()).rejects.toThrow("REDIRECT:/admin/sugerencias");
+  });
+
+  it("no lee las sugerencias de quien va a ser redirigido", async () => {
+    guardPage.mockResolvedValue({ allowed: true, usuario: { ...USUARIO, esAdmin: true } });
+
+    await expect(SugerenciasPage()).rejects.toThrow();
+
+    expect(listarSugerenciasDeAutor).not.toHaveBeenCalled();
+    expect(leerAreaDelAutor).not.toHaveBeenCalled();
+  });
+
+  it("al colaborador lo deja en su buzón, con la barra marcándolo", async () => {
     guardPage.mockResolvedValue({ allowed: true, usuario: USUARIO });
 
     render(await SugerenciasPage());
 
-    expect(screen.getByRole("link", { name: /volver al portal/i })).toHaveAttribute("href", "/");
+    expect(redirect).not.toHaveBeenCalled();
+    expect(
+      within(screen.getByRole("navigation", { name: "Portal" })).getByRole("link", {
+        name: "Buzón de sugerencias",
+      }),
+    ).toHaveAttribute("aria-current", "page");
   });
 
   it("saluda al colaborador con el nombre que el guard leyó de la base", async () => {

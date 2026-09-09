@@ -37,17 +37,21 @@ describe("<Topbar />", () => {
   });
 
   /**
-   * The way home, and the reason the admin screens can wear this bar: before it
-   * they had no route back to the portal at all — `/admin/enlaces` reached from
-   * a bookmark left the reader with the browser's back button and nothing else.
+   * FUE la vuelta a casa, y era la razón por la que las pantallas del panel
+   * podían llevar esta barra: antes de ella no tenían más camino de vuelta que
+   * el botón de atrás del navegador.
+   *
+   * Las dos mitades de ese argumento se cayeron a la vez. `/` ya no es la casa
+   * de quien administra —lo redirige al panel— así que apuntar ahí lo mandaría
+   * de donde viene; y la vuelta ya no falta, porque la barra del colaborador
+   * abre con «Mis recursos», que es ese enlace con su nombre puesto.
    */
-  it("vuelve al portal desde el logo y la marca, que son un solo enlace", () => {
+  it("muestra la marca como título, sin mandar a ninguna parte", () => {
     render(<Topbar usuario={COLABORADORA} />);
 
-    const inicio = screen.getByRole("link", { name: /portal de innovación/i });
-
-    expect(inicio).toHaveAttribute("href", "/");
-    expect(within(inicio).getByRole("img")).toBeInTheDocument();
+    expect(screen.getByText("Portal de Innovación")).toBeInTheDocument();
+    expect(screen.getByRole("img")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /portal de innovación/i })).not.toBeInTheDocument();
   });
 
   /**
@@ -134,3 +138,35 @@ describe("<Topbar />", () => {
   });
 });
 
+
+describe("<Topbar /> — la barra del colaborador", () => {
+  /**
+   * Una barra, dos audiencias, y NUNCA las dos listas a la vez: seis entradas
+   * competirían en una fila, y «Sugerencias» (todas las del portal) junto a
+   * «Buzón de sugerencias» (las tuyas) nombra una palabra para dos poderes
+   * distintos.
+   */
+  it("le da al colaborador sus dos pantallas en vez de dejarlo sin barra", () => {
+    render(<Topbar usuario={{ nombre: "Ana Quispe", esAdmin: false }} />);
+
+    const nav = within(screen.getByRole("navigation", { name: "Portal" }));
+    expect(nav.getByRole("link", { name: "Mis recursos" })).toHaveAttribute("href", "/");
+    expect(nav.getByRole("link", { name: "Buzón de sugerencias" })).toHaveAttribute(
+      "href",
+      "/sugerencias",
+    );
+  });
+
+  it("a quien administra le da el panel, y solo el panel", () => {
+    render(<Topbar usuario={{ nombre: "Rosa Díaz", esAdmin: true }} />);
+
+    expect(screen.getByRole("navigation", { name: "Administración" })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Portal" })).not.toBeInTheDocument();
+  });
+
+  it("al colaborador no le muestra el panel que no puede abrir", () => {
+    render(<Topbar usuario={{ nombre: "Ana Quispe", esAdmin: false }} />);
+
+    expect(screen.queryByRole("navigation", { name: "Administración" })).not.toBeInTheDocument();
+  });
+});

@@ -108,7 +108,7 @@ describe("/admin/asignaciones", () => {
    * soft navigations and the bar has to be re-rendered by each page's own guard.
    * Asserting it here is what keeps one of the nine copies from being dropped.
    */
-  it("wears the shared topbar, with its way back to the portal", async () => {
+  it("wears the shared topbar, whose brand is a title and not a door", async () => {
     guardPageAdmin.mockResolvedValue({ allowed: true, usuario: USUARIA });
 
     render(await AsignacionesPage());
@@ -120,6 +120,10 @@ describe("/admin/asignaciones", () => {
       "aria-haspopup",
       "menu",
     );
-    expect(screen.getByRole("link", { name: /portal de innovación/i })).toHaveAttribute("href", "/");
+    /* La marca es un título, no una puerta: `/` ya no es la casa de quien
+       administra — lo redirige al panel — y la barra le da sus cuatro
+       pantallas. `components/topbar/topbar.tsx` lo explica. */
+    expect(screen.getByText("Portal de Innovación")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /portal de innovación/i })).not.toBeInTheDocument();
   });
 });

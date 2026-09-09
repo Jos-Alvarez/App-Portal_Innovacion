@@ -113,7 +113,7 @@ describe("/admin/catalogo", () => {
    * entre navegaciones suaves y la barra tiene que volver a dibujarse bajo el
    * guard de cada página. Afirmarlo aquí es lo que evita perder una de las copias.
    */
-  it("wears the shared topbar, with its way back to the portal", async () => {
+  it("wears the shared topbar, whose brand is a title and not a door", async () => {
     guardPageAdmin.mockResolvedValue({ allowed: true, usuario: USUARIA });
 
     render(await CatalogoAdminPage());
@@ -125,6 +125,10 @@ describe("/admin/catalogo", () => {
       "aria-haspopup",
       "menu",
     );
-    expect(screen.getByRole("link", { name: /portal de innovación/i })).toHaveAttribute("href", "/");
+    /* La marca es un título, no una puerta: `/` ya no es la casa de quien
+       administra — lo redirige al panel — y la barra le da sus cuatro
+       pantallas. `components/topbar/topbar.tsx` lo explica. */
+    expect(screen.getByText("Portal de Innovación")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /portal de innovación/i })).not.toBeInTheDocument();
   });
 });

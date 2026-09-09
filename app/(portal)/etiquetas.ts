@@ -47,3 +47,27 @@ export const TONO_RECURSO: Record<TipoRecursoAsignado, ChipTone> = {
   ...TONO_TIPO,
   procesador: "navy",
 };
+
+/**
+ * How the dashboard greets the person reading it.
+ *
+ * THE FIRST NAME, NOT THE WHOLE ROW. `usuario.nombre` is the `displayName`
+ * Entra ID reports, which in this tenant is the full legal name — "Jose Rolando
+ * Alvarez Fernandez". A greeting is the one place in the portal that speaks to
+ * somebody rather than about them, and reading their four names back at them is
+ * the opposite of what a greeting is for.
+ *
+ * IT MAY NOT BE A NAME AT ALL, and that is on purpose upstream: both the login
+ * (`mapToUsuarioUpsert`) and the pre-registration fall back to the address when
+ * nothing better is known. An address has no first name, so it comes back
+ * whole — which is honest, and better than greeting somebody by half an e-mail.
+ *
+ * An empty name loses the comma rather than trailing one, because `usuario.nombre`
+ * is NOT NULL with no default and the day something writes `""` into it the
+ * screen should still read as Spanish.
+ */
+export function saludo(nombre: string): string {
+  const primero = nombre.trim().split(/\s+/)[0] ?? "";
+
+  return primero === "" ? "Hola" : `Hola, ${primero}`;
+}
