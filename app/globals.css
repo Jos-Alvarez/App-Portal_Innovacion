@@ -185,20 +185,50 @@ h1 {
   font-size: var(--fs-title);
   font-weight: var(--fw-title);
   letter-spacing: var(--ls-title);
+  /*
+   * El 1.5 del cuerpo es interlineado de LECTURA: separa renglones para que el
+   * ojo vuelva al principio del siguiente sin perderse. Un título de 24px ocupa
+   * un renglón y no se lee, se reconoce — con 1.5 se lleva 12px de aire propio
+   * que después parecen distancia con el subtítulo, cuando en realidad son del
+   * título. 1.2 es el interlineado de despliegue y deja el bloque compacto.
+   */
+  line-height: 1.2;
 }
 
 a {
   color: var(--cyan);
 }
 
-/* Metadatos: 11.5–12.5px en --muted */
+/*
+ * Metadatos: 11.5–12.5px en --muted.
+ *
+ * `margin: 0` NO ES COSMÉTICO. Esta clase describe TEXTO — tamaño y color — y
+ * nada sobre el ritmo vertical de la página; quien decide cuánto aire va entre
+ * dos bloques es el contenedor, con su `gap`. Sin este reset, un
+ * `<p class="lx-meta">` traía además el margen por defecto del navegador (1em,
+ * ~12px arriba y abajo) que se SUMABA al gap: cada encabezado del portal
+ * mostraba su subtítulo al doble de distancia de la que su hoja de estilos
+ * declaraba, y la hoja no mentía — el margen venía de otro lado.
+ *
+ * `h1` ya se resetea arriba por la misma razón. Los `<span class="lx-meta">`
+ * nunca tuvieron el problema: un elemento en línea no lleva margen de bloque.
+ */
 .lx-meta {
+  margin: 0;
   font-size: var(--fs-meta);
   color: var(--muted);
 }
 
-/* Etiquetas de tipo/estado: 10.5–11px / 700 / uppercase */
+/*
+ * Etiquetas de tipo/estado: 10.5–11px / 700 / uppercase.
+ *
+ * `margin: 0` por lo mismo que `.lx-meta`: es una clase de TEXTO, y el aire
+ * entre bloques lo pone el `gap` del contenedor. Como esta etiqueta encabeza
+ * varios headers del panel, su margen por defecto empujaba el título hacia
+ * abajo además de separar el subtítulo.
+ */
 .lx-label {
+  margin: 0;
   font-size: var(--fs-label);
   font-weight: var(--fw-label);
   text-transform: uppercase;
