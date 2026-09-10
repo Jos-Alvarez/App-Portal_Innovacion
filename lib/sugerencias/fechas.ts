@@ -70,5 +70,5 @@ const FORMATO_FECHA = new Intl.DateTimeFormat("es-PE", {
 export function formatearFecha(iso: string): string {
   const fecha = new Date(iso);
 
-  return Number.isNaN(fecha.getTime()) ? "—" : FORMATO_FECHA.format(fecha);
+  return Number.isNaN(fecha.getTime()) ? "—" : FORMATO_FECHA.format(fecha).replace(/[\u202f\u00a0]/g, ' ');
 }
