@@ -30,6 +30,12 @@ pnpm-debug.log*
 lerna-debug.log*
 .pnpm-debug.log*
 
+# Salida del servidor corriendo. La escribe el servicio que arranca
+# `start_app.bat` en el servidor, y describe una ejecucion concreta en una
+# maquina concreta: versionarla mezclaria el registro de un entorno con el
+# codigo de todos.
+logs/
+
 # Despliegue
 .vercel
 
