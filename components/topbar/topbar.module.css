@@ -110,7 +110,7 @@
   width: 32px;
   height: 32px;
   border-radius: var(--radius-pill);
-  background: var(--navy);
+  background: var(--navy) url("/api/usuarios/me/foto") center / cover no-repeat;
   color: var(--on-primary);
   font-size: 12px;
   font-weight: 700;
@@ -118,16 +118,77 @@
   letter-spacing: 0.02em;
 }
 
+.infoUsuario {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
 /*
  * El nombre. Es el nombre accesible del disparador, así que no puede esconderse
- * en pantallas chicas: `--fs-meta` en `--muted` lo baja de peso sin sacarlo,
- * que es lo que pedía DESIGN.md para un metadato.
+ * en pantallas chicas.
  */
 .nombre {
-  color: var(--muted);
-  font-size: var(--fs-meta);
+  color: inherit;
+  font-size: var(--fs-body-sm);
   font-weight: 600;
   white-space: nowrap;
+  line-height: 1;
+}
+
+.rolDisparador {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 400;
+}
+
+.cabeceraDesplegable {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 8px 12px;
+  gap: 2px;
+}
+
+.cabeceraDesplegable .nombre {
+  color: var(--navy-fg);
+}
+
+.emailDesplegable {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+.pillRol {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: var(--cyan-soft);
+  color: var(--cyan);
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.salir {
+  color: #d32f2f !important;
+}
+
+.salir:hover, .salir:focus {
+  background: #fff5f5 !important;
+  color: #d32f2f !important;
+}
+
+.iconoFlecha {
+  margin-left: 4px;
+  transition: transform 0.2s ease;
+}
+
+.iconoFlecha[data-abierto="true"] {
+  transform: rotate(180deg);
 }
 
 /*
@@ -147,7 +208,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 210px;
+  min-width: 100%;
   padding: 6px;
   border: 1px solid var(--border);
   border-radius: var(--radius-card);

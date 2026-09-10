@@ -138,9 +138,16 @@ export interface SessionUser {
  *
  * `id` is the `sub` claim — Entra ID's immutable subject — and NOT the address:
  * an address can be reassigned, and Auth.js uses this value as the token's
- * subject. `image` is deliberately absent: the provider's default `profile()`
- * fetched a photo from Graph on every single login, and nothing in this portal
- * renders one — the topbar draws initials.
+ * subject.
+ *
+ * `image` is deliberately absent, and the reason changed without changing the
+ * decision. The provider's default `profile()` asked Graph for the photo on
+ * every single login and put it here as base64; when this was written, the
+ * reason to drop it was that nothing rendered one. Something does now —
+ * `lib/graph/foto.ts` serves it and the topbar's disc paints it — and it still
+ * does not belong here: a photo is several kilobytes, the session token is a
+ * COOKIE, and a cookie travels on every request the browser makes to this
+ * portal, `/api` included. ADR 0007 keeps the session to the identity.
  */
 export function mapToSessionUser(claims: IdentityClaims & { sub?: unknown }): SessionUser {
   return {

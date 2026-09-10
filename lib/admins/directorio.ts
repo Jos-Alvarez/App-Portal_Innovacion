@@ -1,4 +1,11 @@
 import type { DirectorioEnv } from "@/lib/admins/directorio-env";
+import {
+  GRAPH_SCOPE,
+  TIMEOUT_MS,
+  type FetchLike,
+  pedirTokenDeAplicacion,
+  tokenUrl,
+} from "@/lib/graph/token";
 import { RESULTADOS_MAX } from "@/lib/admins/schema";
 import { normalizeEmail } from "@/lib/auth/identity";
 
@@ -40,8 +47,13 @@ import { normalizeEmail } from "@/lib/auth/identity";
  * silently turn an unconsented permission into "esa persona no existe".
  */
 
-/** Injectable for tests; defaults to the platform `fetch`. */
-export type FetchLike = typeof fetch;
+/*
+ * El token, su URL, su scope y su plazo viven en `lib/graph/token.ts` desde que
+ * la foto de perfil pasó a ser la segunda llamada del portal a Graph: pedir un
+ * token de aplicación nunca fue un detalle de buscar personas. Se reexportan
+ * para no romper a quien ya los importaba desde acá.
+ */
+export { GRAPH_SCOPE, TIMEOUT_MS, tokenUrl, type FetchLike };
 
 /** One person as the directory describes them, before the portal knows anything. */
 export interface PersonaDirectorio {
@@ -52,33 +64,8 @@ export interface PersonaDirectorio {
   area: string;
 }
 
-/** Where an application token comes from, for a tenant-specific issuer. */
-export function tokenUrl(tenantId: string): string {
-  return `https://login.microsoftonline.com/${encodeURIComponent(tenantId)}/oauth2/v2.0/token`;
-}
-
-/**
- * The application scope: every permission already consented for the app.
- *
- * `.default` is the client-credentials form — the flow cannot ask for a subset,
- * and the set it gets is whatever TI granted. `User.Read.All` is the one this
- * search needs (ADR 0009); if it was never consented, Graph answers 403 and the
- * caller degrades.
- */
-export const GRAPH_SCOPE = "https://graph.microsoft.com/.default";
-
 /** The directory endpoint. `$select` keeps the payload to the four fields used. */
 export const GRAPH_USERS_URL = "https://graph.microsoft.com/v1.0/users";
-
-/**
- * The portal's deadline for one directory round trip.
- *
- * Eight seconds, and unlike the mail send it IS about the user: an administrator
- * is watching a search field. An unbounded `fetch` against a hanging endpoint
- * would leave them looking at a spinner with no way to reach the degraded search
- * that would have answered instantly.
- */
-export const TIMEOUT_MS = 8_000;
 
 /** OData string literals are single-quoted; a quote inside one is doubled. */
 function escaparLiteral(valor: string): string {
@@ -140,39 +127,6 @@ export function mapearPersona(fila: FilaGraph): PersonaDirectorio | null {
   return { correo, nombre: texto(fila.displayName) || correo, area: texto(fila.department) };
 }
 
-/**
- * An application token for Microsoft Graph.
- *
- * @throws Error when the token endpoint refuses or is unreachable. The body of a
- *         refusal is NOT included: it echoes the client id and, in some error
- *         shapes, part of the request — and this message reaches a server log.
- */
-async function pedirToken(env: DirectorioEnv, fetchImpl: FetchLike): Promise<string> {
-  const respuesta = await fetchImpl(tokenUrl(env.tenantId), {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: env.clientId,
-      client_secret: env.clientSecret,
-      scope: GRAPH_SCOPE,
-      grant_type: "client_credentials",
-    }),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
-
-  if (!respuesta.ok) {
-    throw new Error(`Entra ID refused the application token with ${respuesta.status}.`);
-  }
-
-  const cuerpo: unknown = await respuesta.json();
-  const token = (cuerpo as { access_token?: unknown } | null)?.access_token;
-
-  if (typeof token !== "string" || token === "") {
-    throw new Error("Entra ID answered the token request without an access_token.");
-  }
-
-  return token;
-}
 
 export interface BusquedaEnDirectorioOptions {
   env: DirectorioEnv;
@@ -193,7 +147,7 @@ export async function buscarEnDirectorio(
   termino: string,
   { env, fetchImpl = fetch, limite = RESULTADOS_MAX }: BusquedaEnDirectorioOptions,
 ): Promise<PersonaDirectorio[]> {
-  const token = await pedirToken(env, fetchImpl);
+  const token = await pedirTokenDeAplicacion(env, fetchImpl);
 
   const url = new URL(GRAPH_USERS_URL);
   url.searchParams.set("$select", "displayName,mail,userPrincipalName,department");
