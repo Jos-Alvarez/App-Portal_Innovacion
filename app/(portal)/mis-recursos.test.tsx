@@ -234,15 +234,26 @@ describe("MisRecursos", () => {
       expect(tarjeta("Maestro de Excel")).toHaveAttribute("data-tipo", "procesador");
     });
 
-    it("dice a dónde lleva su acción antes de que la toquen", () => {
+    it("cierra con el tipo junto a la acción, no con una frase que el botón ya dice", () => {
       render(montar([APP, PROCESADOR]));
 
-      expect(
-        within(tarjeta("Portal de Compras")).getByText("Se abre en una pestaña nueva"),
-      ).toBeInTheDocument();
-      expect(
-        within(tarjeta("Maestro de Excel")).getByText("Se ejecuta aquí, en el portal"),
-      ).toBeInTheDocument();
+      /* El chip bajó al pie: arriba competía con el nombre por la primera
+         mirada, y la frase que ocupaba ese lugar repetía lo que el botón —con
+         su `↗` y su `aria-label`— ya decía mejor. */
+      expect(within(tarjeta("Portal de Compras")).getByText("Aplicación")).toBeInTheDocument();
+      expect(within(tarjeta("Maestro de Excel")).getByText("Procesador")).toBeInTheDocument();
+      expect(screen.queryByText(/se abre en una pestaña nueva/i)).not.toBeInTheDocument();
+    });
+
+    it("el nombre abre la tarjeta: es lo que el lector vino a buscar", () => {
+      render(montar([APP]));
+
+      /* El tipo lo adelanta el color del borde y lo confirma el chip del pie,
+         así que la primera línea puede ser el recurso en sí. */
+      const contenido = tarjeta("Portal de Compras").textContent ?? "";
+      expect(contenido.indexOf("Portal de Compras")).toBeLessThan(
+        contenido.indexOf("Aplicación"),
+      );
     });
 
     it("nombra cada recurso como encabezado, no como texto en negrita", () => {
@@ -322,12 +333,20 @@ describe("MisRecursos", () => {
       expect(ejecutar).not.toHaveAttribute("target");
     });
 
-    it("nombra el recurso en la acción, porque todas las filas dicen «Ejecutar»", () => {
+    it("dice «Usar» y no «Ejecutar», que era una tercera palabra para lo mismo", () => {
       render(montar([PROCESADOR]));
 
-      expect(
-        screen.getByRole("link", { name: /Ejecutar Maestro de Excel/i }),
-      ).toBeInTheDocument();
+      /* La pantalla a la que lleva llama a SU acción «Procesar»: este botón
+         dice a qué se va, el de allá dice qué hace. */
+      expect(screen.getByRole("link", { name: /Usar Maestro de Excel/i })).toHaveTextContent(
+        "Usar",
+      );
+    });
+
+    it("nombra el recurso en la acción, porque todas las tarjetas dicen lo mismo", () => {
+      render(montar([PROCESADOR]));
+
+      expect(screen.getByRole("link", { name: /Usar Maestro de Excel/i })).toBeInTheDocument();
     });
 
     it("ya no explica ninguna espera debajo de la grilla", () => {

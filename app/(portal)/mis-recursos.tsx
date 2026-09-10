@@ -133,13 +133,16 @@ function accion(recurso: RecursoAsignado) {
   if (recurso.tipo === "procesador") {
     return (
       <Link
-        className="lx-btn lx-btn-secondary"
+        className={`lx-btn ${styles.tarjetaAccion}`}
         href={`/procesadores/${recurso.id}`}
         /* Every card's action says the same word; the name is what tells them
            apart for anyone navigating by link. */
-        aria-label={`Ejecutar ${recurso.nombre}`}
+        aria-label={`Usar ${recurso.nombre}`}
       >
-        Ejecutar
+        {/* «Usar» y no «Ejecutar»: la pantalla a la que lleva llama a SU acción
+            «Procesar», así que «Ejecutar» acá era una tercera palabra para el
+            mismo viaje. Este botón dice a qué se va, el de allá qué hace. */}
+        Usar
       </Link>
     );
   }
@@ -162,11 +165,13 @@ function accion(recurso: RecursoAsignado) {
      * this one through `window.opener` and can navigate the portal's tab
      * elsewhere (reverse tabnabbing).
      *
-     * Secondary and not primary: DESIGN.md allows "una acción primaria (navy)
-     * por vista", and a grid of ten cards would otherwise carry ten of them.
+     * NO ES NAVY, y por la regla de siempre: DESIGN.md admite "una acción
+     * primaria (navy) por vista", y una grilla de diez tarjetas llevaría diez.
+     * El relleno suave de `.tarjetaAccion` le da el peso que un contorno fino
+     * no le daba sin reclamar ese lugar; `portal.module.css` lo argumenta.
      */
     <a
-      className="lx-btn lx-btn-secondary"
+      className={`lx-btn ${styles.tarjetaAccion}`}
       href={`/api/enlaces/${recurso.id}/abrir`}
       target="_blank"
       rel="noopener noreferrer"
@@ -175,10 +180,6 @@ function accion(recurso: RecursoAsignado) {
       aria-label={`Abrir ${recurso.nombre} en una pestaña nueva`}
     >
       Abrir
-      {/* Iconografía FUNCIONAL, la única que DESIGN.md admite: dice que el clic
-          se va del portal. El `aria-label` de arriba ya lo cuenta en palabras,
-          así que para la tecnología asistiva esto sobra. */}
-      <span aria-hidden="true"> ↗</span>
     </a>
   );
 }
@@ -218,19 +219,6 @@ const ETIQUETA_FILTRO: Record<TipoRecursoAsignado, string> = {
 
 const TODOS = "todos" as const;
 type Filtro = typeof TODOS | TipoRecursoAsignado;
-
-/**
- * Lo que la tarjeta dice de su acción antes de que la toquen.
- *
- * Las dos son distintas de verdad y el lector merece saber cuál le toca: una se
- * va del portal a otra pestaña, la otra abre una pantalla de trabajo acá mismo.
- * `accion` explica por qué esa diferencia también cambia el elemento.
- */
-const PISTA: Record<TipoRecursoAsignado, string> = {
-  app: "Se abre en una pestaña nueva",
-  agente: "Se abre en una pestaña nueva",
-  procesador: "Se ejecuta aquí, en el portal",
-};
 
 export function MisRecursos({ recursosIniciales }: MisRecursosProps) {
   const { data, error } = useSWR<readonly RecursoAsignado[]>(
@@ -331,12 +319,10 @@ export function MisRecursos({ recursosIniciales }: MisRecursosProps) {
                    antes de leer el chip. */
                 data-tipo={recurso.tipo}
               >
-                <StatusChip tone={TONO_RECURSO[recurso.tipo]}>
-                  {ETIQUETA_RECURSO[recurso.tipo]}
-                </StatusChip>
-
                 {/* `h2` bajo el «Hola, …» de la página: la grilla es una lista de
-                    secciones navegables por encabezado, no un párrafo en negrita. */}
+                    secciones navegables por encabezado, no un párrafo en negrita.
+                    Abre la tarjeta porque es lo que el lector busca — el tipo lo
+                    adelanta el color del borde y lo confirma el chip del pie. */}
                 <h2 className={styles.tarjetaNombre}>{recurso.nombre}</h2>
 
                 {recurso.descripcion ? (
@@ -346,8 +332,23 @@ export function MisRecursos({ recursosIniciales }: MisRecursosProps) {
                 {/* `margin-top: auto` en el CSS lo empuja abajo, así que todas las
                     acciones quedan alineadas aunque las descripciones midan
                     distinto. */}
+                {/*
+                  * EL TIPO CIERRA LA TARJETA, junto a la acción.
+                  *
+                  * Antes acá iba una frase — «Se abre en una pestaña nueva» —
+                  * que el botón ya dice mejor: el `↗` lo muestra y su
+                  * `aria-label` lo escribe para quien no lo ve. Esa línea
+                  * gastaba el pie en repetir lo que estaba al lado.
+                  *
+                  * El chip sí gana con el cambio de lugar. Arriba competía con
+                  * el nombre por la primera mirada; abajo confirma lo que el
+                  * color del borde ya adelantó, y deja que la tarjeta empiece
+                  * por lo que el lector vino a buscar.
+                  */}
                 <div className={styles.tarjetaPie}>
-                  <span className="lx-meta">{PISTA[recurso.tipo]}</span>
+                  <StatusChip tone={TONO_RECURSO[recurso.tipo]}>
+                    {ETIQUETA_RECURSO[recurso.tipo]}
+                  </StatusChip>
                   {accion(recurso)}
                 </div>
               </li>

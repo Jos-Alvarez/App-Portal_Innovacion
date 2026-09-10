@@ -72,6 +72,20 @@
   flex-direction: column;
   gap: 10px;
   align-items: flex-start;
+  /*
+   * ALTURA MÍNIMA, Y NO SOLO `stretch`.
+   *
+   * `align-items: stretch` empareja las tarjetas de una MISMA fila, así que una
+   * sin descripción ya no se veía más chica que su vecina. Lo que no resolvía
+   * es el caso en que NINGUNA la tenga: la fila entera se encogía a la altura
+   * del nombre más el pie, y la grilla pasaba de tarjetas a botones con título.
+   *
+   * 190px es lo que mide una tarjeta con dos renglones de descripción — la
+   * forma que el lector va a ver casi siempre. Reservarla de entrada hace que
+   * la grilla tenga el mismo peso tenga o no tenga texto que mostrar, y que
+   * agregarle una descripción a un recurso no mueva de lugar a los demás.
+   */
+  min-height: 190px;
   padding: 22px 24px 20px;
   border: 1px solid var(--border);
   border-top: 4px solid var(--cyan);
@@ -157,4 +171,37 @@
   margin-top: auto;
   padding-top: 14px;
   border-top: 1px solid var(--border);
+}
+/*
+ * ══════════════════════════════════════════════════════════════════════════
+ *  LA ACCIÓN DE LA TARJETA
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * Era `.lx-btn-secondary` — un contorno fino sobre nada — y en una grilla se
+ * perdía: la tarjeta entera pesa más que su propio botón, que es justo lo que
+ * el lector vino a apretar.
+ *
+ * NO PUEDE SER NAVY. DESIGN.md admite "una acción primaria (navy) por vista" y
+ * acá hay una acción por tarjeta; tres tarjetas serían tres primarias
+ * compitiendo, y diez serían diez.
+ *
+ * Así que toma el relleno SUAVE que el sistema ya tiene para exactamente este
+ * peso intermedio: `--cyan-soft` de fondo con `--navy-fg` de texto es el mismo
+ * par que llevan el chip de tipo y la pestaña activa. Se lee como un botón
+ * lleno sin reclamar el lugar de la acción primaria.
+ *
+ * Y AL PASAR EL MOUSE SÍ SE VUELVE NAVY. En ese momento no hay ambigüedad sobre
+ * cuál es la acción en juego —es la que está debajo del cursor— así que el
+ * relleno pleno confirma el clic en vez de disputarle protagonismo a nadie.
+ */
+.tarjetaAccion {
+  padding: 9px 18px;
+  background: var(--cyan-soft);
+  color: var(--navy-fg);
+  text-decoration: none;
+}
+
+.tarjetaAccion:hover {
+  background: var(--navy);
+  color: var(--on-primary);
 }
