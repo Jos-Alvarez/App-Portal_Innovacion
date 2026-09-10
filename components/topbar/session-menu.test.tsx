@@ -32,9 +32,16 @@ beforeEach(() => {
   usePathname.mockReset().mockReturnValue("/");
 });
 
-/** The trigger's accessible name is the name it paints; the disc is decoration. */
+/**
+ * El disparador, por su nombre accesible COMPLETO.
+ *
+ * Lleva el nombre y el rol, que es exactamente lo que pinta: el disco de
+ * iniciales y la flecha son decoración y están `aria-hidden`, pero el rol es
+ * información nueva y WCAG 2.5.3 pide que la etiqueta visible esté contenida en
+ * el nombre accesible. Buscarlo entero es lo que afirma esa regla.
+ */
 function disparador() {
-  return screen.getByRole("button", { name: NOMBRE });
+  return screen.getByRole("button", { name: new RegExp(NOMBRE) });
 }
 
 /**
@@ -63,7 +70,30 @@ describe("<SessionMenu />", () => {
     render(<SessionMenu nombre={NOMBRE} />);
 
     expect(screen.getByText("RD")).toHaveAttribute("aria-hidden", "true");
-    expect(disparador()).toHaveAccessibleName(NOMBRE);
+    /* El disco es el nombre en otra forma: anunciar "R D Rosa Díaz" no le
+       agrega nada a nadie, así que no entra en el nombre accesible. */
+    expect(disparador()).toHaveAccessibleName(`${NOMBRE} Colaborador`);
+  });
+
+  /**
+   * EL ROL SÍ ENTRA, y es lo contrario del disco: no repite el nombre, es
+   * información nueva — la misma que ve quien mira la pantalla. Taparlo con
+   * `aria-hidden` dejaría el nombre accesible en "Rosa Díaz" mientras la
+   * etiqueta visible dice "Rosa Díaz Administrador", y WCAG 2.5.3 pide lo
+   * contrario: que la visible esté CONTENIDA en la accesible, o quien maneja el
+   * portal por voz no puede pedir lo que lee.
+   */
+  it("dice el rol en el nombre accesible, no solo en pantalla", () => {
+    render(<SessionMenu nombre={NOMBRE} esAdmin />);
+
+    expect(disparador()).toHaveAccessibleName(`${NOMBRE} Administrador`);
+  });
+
+  it("la flecha no entra en el nombre: `aria-expanded` ya dice si está abierto", () => {
+    render(<SessionMenu nombre={NOMBRE} />);
+
+    expect(disparador()).toHaveAttribute("aria-expanded", "false");
+    expect(disparador()).toHaveAccessibleName(`${NOMBRE} Colaborador`);
   });
 
   it("abre el menú con el tema y la salida adentro", async () => {

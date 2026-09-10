@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const guardPageAdmin = vi.fn();
@@ -82,7 +82,16 @@ describe("/admin/asignaciones", () => {
     expect(screen.getByText("2 enlaces · 1 procesador")).toBeInTheDocument();
     /* An account with nothing reads as a sentence, never as "0 · 0". */
     expect(screen.getByText("Sin accesos asignados")).toBeInTheDocument();
-    expect(screen.getByText("Administrador")).toBeInTheDocument();
+    /*
+     * Acotado a la tarjeta de Beto: la barra superior también dice
+     * «Administrador» ahora, como rol de quien MIRA. Son dos cosas distintas con
+     * la misma palabra — este chip marca una cuenta del listado, el de arriba
+     * marca al lector — así que buscarla suelta encuentra las dos, y afirmarla
+     * sin acotar dejaría de probar de cuál de las dos se trata.
+     */
+    expect(
+      within(screen.getByRole("link", { name: /beto ríos/i })).getByText("Administrador"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Dada de baja")).toBeInTheDocument();
     /* Entra ID does not always report a department. */
     expect(screen.getByText("Sin área")).toBeInTheDocument();
@@ -116,7 +125,7 @@ describe("/admin/asignaciones", () => {
     expect(screen.getByText("Rosa Díaz")).toBeInTheDocument();
     /* La salida vive detrás del menú de sesión; lo que la pantalla garantiza
        es que ese menú esté montado. `session-menu.test.tsx` cubre su interior. */
-    expect(screen.getByRole("button", { name: "Rosa Díaz" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Rosa Díaz Administrador" })).toHaveAttribute(
       "aria-haspopup",
       "menu",
     );

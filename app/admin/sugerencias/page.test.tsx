@@ -144,7 +144,7 @@ describe("/admin/sugerencias", () => {
     expect(screen.getByText("Rosa Díaz")).toBeInTheDocument();
     /* La salida vive detrás del menú de sesión; lo que la pantalla garantiza
        es que ese menú esté montado. `session-menu.test.tsx` cubre su interior. */
-    expect(screen.getByRole("button", { name: "Rosa Díaz" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Rosa Díaz Administrador" })).toHaveAttribute(
       "aria-haspopup",
       "menu",
     );

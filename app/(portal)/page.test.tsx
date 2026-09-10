@@ -215,7 +215,7 @@ describe("/ (dashboard del colaborador)", () => {
 
     render(await PortalPage());
 
-    expect(screen.getByRole("button", { name: "Ana Quispe" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Ana Quispe Colaborador" })).toHaveAttribute(
       "aria-haspopup",
       "menu",
     );

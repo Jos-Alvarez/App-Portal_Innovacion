@@ -62,7 +62,7 @@ describe("<Topbar />", () => {
   it("le da a cualquiera el menú de sesión, cerrado", () => {
     render(<Topbar usuario={COLABORADORA} />);
 
-    const disparador = screen.getByRole("button", { name: "Ana Quispe" });
+    const disparador = screen.getByRole("button", { name: "Ana Quispe Colaborador" });
 
     expect(disparador).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
@@ -111,7 +111,7 @@ describe("<Topbar />", () => {
   it("pone la nav antes del menú de sesión", () => {
     render(<Topbar usuario={ADMINISTRADORA} />);
 
-    const disparador = screen.getByRole("button", { name: "Rosa Díaz" });
+    const disparador = screen.getByRole("button", { name: "Rosa Díaz Administrador" });
     const nav = screen.getByRole("navigation", { name: "Administración" });
 
     expect(nav.compareDocumentPosition(disparador) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

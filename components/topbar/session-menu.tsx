@@ -253,14 +253,44 @@ export function SessionMenu({ nombre, esAdmin = false }: SessionMenuProps) {
         onKeyDown={alTeclearEnDisparador}
       >
         {/*
-         * The disc is the name in another shape, so it is `aria-hidden`: the
-         * trigger's accessible name is the name itself, and announcing "R D Rosa
-         * Díaz" helps nobody.
+         * QUÉ ENTRA EN EL NOMBRE ACCESIBLE DEL DISPARADOR, Y QUÉ NO.
+         *
+         * El disco sigue `aria-hidden`: es el nombre en otra forma, y anunciar
+         * "R D Rosa Díaz" no le agrega nada a nadie. La flecha también, porque
+         * `aria-expanded` ya dice si el panel está abierto.
+         *
+         * EL ROL NO SE ESCONDE, y ahí está la diferencia. No repite el nombre:
+         * es información nueva, la misma que ve quien mira la pantalla. Taparlo
+         * con `aria-hidden` dejaría el nombre accesible en "Rosa Díaz" mientras
+         * la etiqueta visible dice "Rosa Díaz Administrador" — y WCAG 2.5.3
+         * pide lo contrario, que la etiqueta visible esté CONTENIDA en el nombre
+         * accesible, o quien maneja el portal por voz no puede pedir lo que lee.
+         *
+         * Así que el disparador se llama "Rosa Díaz Administrador", y las
+         * pruebas que lo buscan lo afirman completo.
          */}
         <span className={styles.avatar} aria-hidden="true">
           {inicialesDe(nombre)}
         </span>
-        <span className={styles.nombre}>{nombre}</span>
+        {/* `span` y no `div`: un `<button>` solo admite contenido de frase, y
+            `.infoUsuario` ya declara su propio `display: flex`. */}
+        <span className={styles.infoUsuario}>
+          <span className={styles.nombre}>{nombre}</span>
+          <span className={styles.rolDisparador}>{esAdmin ? "Administrador" : "Colaborador"}</span>
+        </span>
+        <svg
+          className={styles.iconoFlecha}
+          data-abierto={abierto}
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          aria-hidden="true"
+        >
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
       </button>
 
       {abierto ? (

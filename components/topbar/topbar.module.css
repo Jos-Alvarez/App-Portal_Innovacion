@@ -173,13 +173,25 @@
   margin-top: 4px;
 }
 
+/*
+ * La salida, en el rojo del sistema y no en uno propio.
+ *
+ * `#d32f2f` y `#fff5f5` no tienen variante oscura: sobre `--surface` oscuro
+ * (#121F37) ese rojo reprueba AA y ese fondo casi blanco quedaría como un
+ * parche encendido en un menú oscuro. `--danger` y `--danger-bg` resuelven solos
+ * en los dos temas — es para eso que existen.
+ *
+ * `!important` se queda: `.lx-menu-item` define su propio color y esta regla
+ * tiene que ganarle.
+ */
 .salir {
-  color: #d32f2f !important;
+  color: var(--danger) !important;
 }
 
-.salir:hover, .salir:focus {
-  background: #fff5f5 !important;
-  color: #d32f2f !important;
+.salir:hover,
+.salir:focus {
+  background: var(--danger-bg) !important;
+  color: var(--danger) !important;
 }
 
 .iconoFlecha {

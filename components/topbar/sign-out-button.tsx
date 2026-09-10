@@ -2,6 +2,8 @@
 
 import { signOut } from "next-auth/react";
 
+import styles from "./topbar.module.css";
+
 /**
  * The portal's single sign-out action — backlog item #17, now an entry in the
  * topbar's session menu.
@@ -54,7 +56,7 @@ export function SignOutButton() {
        * trigger is the menu's single tab stop. `SessionMenu` moves focus here.
        */
       tabIndex={-1}
-      className="lx-menu-item"
+      className={`lx-menu-item ${styles.salir}`}
       onClick={() => void signOut({ redirectTo: "/login" })}
     >
       {/*
